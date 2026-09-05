@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#11211d" />
-    <title>Archivo sonoro</title>
+    <title>Búsqueda semántica sobre audios de archivo periodístico</title>
     <style>
       body { margin: 0; }
       .project-home-link { display: block; padding: .8rem 1.25rem; color: #dfeee8; background: #11211d; font: 500 .95rem/1.45 system-ui, sans-serif; text-align: center; }
@@ -13,12 +13,29 @@
     </style>
   </head>
   <body>
-    <a class="project-home-link" href="https://hordiales.github.io/audio-semantic-search-for-journalists/">
+    <a id="project-home-link" class="project-home-link" href="https://hordiales.github.io/audio-semantic-search-for-journalists/">
       Inicio: conocé el proyecto y conversá con un agente para buscar semánticamente en un corpus de archivo periodístico.
     </a>
     <div id="root">
       <p class="app-loading-notice">La primera consulta puede demorar bastante porque inicializa los servicios.</p>
     </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (() => {
+        const link = document.getElementById("project-home-link");
+        const locale = () => {
+          const fromUrl = new URLSearchParams(location.search).get("lang");
+          const saved = localStorage.getItem("audio-search-locale");
+          return fromUrl === "en" || fromUrl === "es" ? fromUrl : (saved === "en" || saved === "es" ? saved : (navigator.languages.some(language => language.toLowerCase().startsWith("en")) ? "en" : "es"));
+        };
+        const render = (language) => {
+          const english = language === "en";
+          link.textContent = english ? "Home: learn about the project and talk to an agent to search the journalistic audio archive." : "Inicio: conocé el proyecto y conversá con un agente para buscar semánticamente en un corpus de archivo periodístico.";
+          link.href = `https://hordiales.github.io/audio-semantic-search-for-journalists/${english ? "?lang=en" : "?lang=es"}`;
+        };
+        window.addEventListener("audio-search-locale-change", event => render(event.detail));
+        render(locale());
+      })();
+    </script>
   </body>
 </html>

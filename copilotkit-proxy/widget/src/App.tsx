@@ -1,7 +1,7 @@
 import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotPopup } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
-import { useRef, useState, type AnchorHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, useState, type AnchorHTMLAttributes, type ReactNode } from "react";
 
 declare const __RUNTIME_URL__: string | undefined;
 
@@ -9,6 +9,13 @@ const runtimeUrl = __RUNTIME_URL__ || import.meta.env.VITE_COPILOT_RUNTIME_URL |
 const feedbackUrl = runtimeUrl.replace(/\/api\/copilotkit\/?$/, "/api/feedback");
 
 type FeedbackKind = "thumbsUp" | "thumbsDown";
+type Locale = "es" | "en";
+
+function currentLocale(): Locale {
+  const saved = window.localStorage.getItem("audio-search-locale");
+  if (saved === "en" || saved === "es") return saved;
+  return navigator.languages.some(language => language.toLowerCase().startsWith("en")) ? "en" : "es";
+}
 
 function messageText(message: unknown): string {
   return typeof (message as { content?: unknown } | undefined)?.content === "string"
@@ -74,11 +81,21 @@ function ClipLink({ href, children, ...props }: AnchorHTMLAttributes<HTMLAnchorE
 
 export default function App() {
   const lastQuestion = useRef("");
+  const [locale, setLocale] = useState<Locale>(currentLocale);
+  useEffect(() => {
+    const update = (event: Event) => {
+      const next = (event as CustomEvent<Locale>).detail;
+      if (next === "es" || next === "en") setLocale(next);
+    };
+    window.addEventListener("audio-search-locale-change", update);
+    return () => window.removeEventListener("audio-search-locale-change", update);
+  }, []);
+  const english = locale === "en";
   return (
     <CopilotKit runtimeUrl={runtimeUrl} agent="default" useSingleEndpoint showDevConsole={false}>
       <CopilotPopup
-        instructions="Respondé en español y citá el archivo y timestamps que entregue el agente."
-        labels={{ title: "Búsqueda de audio", initial: "¿Qué querés encontrar en el archivo de audio?" }}
+        instructions={english ? "Respond in English and cite the file and timestamps returned by the agent." : "Respondé en español y citá el archivo y timestamps que entregue el agente."}
+        labels={english ? { title: "Audio search", initial: "What would you like to find in the audio archive?" } : { title: "Búsqueda de audio", initial: "¿Qué querés encontrar en el archivo de audio?" }}
         markdownTagRenderers={{ a: ClipLink }}
         onSubmitMessage={(message: string) => { lastQuestion.current = message; }}
         onThumbsUp={(message: unknown) => sendFeedback(message, "thumbsUp", lastQuestion.current)}

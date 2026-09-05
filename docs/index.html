@@ -3,18 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Búsqueda semántica de audio para periodistas</title>
-    <meta
-      name="description"
-      content="Asistente para encontrar declaraciones y eventos acústicos en archivos de audio periodístico."
-    />
+    <title>Búsqueda semántica sobre audios de archivo periodístico</title>
+    <meta name="description" content="Asistente para encontrar declaraciones y eventos acústicos en archivos de audio periodístico." />
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #15213b; background: #f7f9fc; }
       body { margin: 0; line-height: 1.6; }
-      main { max-width: 760px; padding: 4rem 1.5rem 7rem; margin: auto; }
+      main { max-width: 760px; padding: 2rem 1.5rem 7rem; margin: auto; }
+      .topbar { align-items: center; display: flex; justify-content: space-between; margin-bottom: 2.5rem; }
       h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.1; margin: 0 0 1rem; }
       h2 { margin-top: 2.5rem; }
-      .eyebrow { color: #3157a5; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+      .eyebrow { color: #3157a5; font-weight: 700; letter-spacing: .06em; margin: 0; text-transform: uppercase; }
+      .language-selector { align-items: center; display: flex; font-size: .85rem; font-weight: 650; gap: .5rem; }
+      .language-selector select { background: #fff; border: 1px solid #b7c5df; border-radius: .35rem; color: #15213b; padding: .35rem .5rem; }
       .lead { font-size: 1.2rem; color: #42526e; }
       .features { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); padding: 0; list-style: none; }
       .features li { background: #fff; padding: 1.1rem; border: 1px solid #dce3ef; border-radius: .75rem; }
@@ -23,38 +23,102 @@
       .direct-search-link:hover { border-color: #214aa5; box-shadow: 0 2px 8px rgb(21 33 59 / 10%); }
       .direct-search-link strong, .agent-widget-note strong { color: #214aa5; }
       a { color: #214aa5; }
-      code { background: #e9eef8; padding: .15rem .3rem; border-radius: .25rem; }
     </style>
   </head>
   <body>
     <main>
-      <p class="eyebrow">Herramienta para redacciones</p>
-      <h1>Búsqueda semántica de audio para periodistas</h1>
-      <p class="lead">
-        Encontrá declaraciones, temas y eventos acústicos en material sonoro procesado,
-        con referencias al archivo de origen y sus timestamps.
-      </p>
+      <div class="topbar">
+        <p class="eyebrow" id="eyebrow"></p>
+        <label class="language-selector"><span id="language-label"></span><select id="language-selector" aria-label="Language"><option value="es">Español</option><option value="en">English</option></select></label>
+      </div>
+      <h1 id="heading"></h1>
+      <p class="lead" id="lead"></p>
 
-      <h2>Qué puede buscar</h2>
+      <h2 id="features-heading"></h2>
       <ul class="features">
-        <li><strong>Transcripciones</strong><br />Consultas semánticas sobre lo dicho en entrevistas, discursos y grabaciones.</li>
-        <li><strong>Eventos de audio</strong><br />Búsqueda cross-modal de aplausos, música y otros sonidos mediante CLAP.</li>
-        <li><strong>Evidencia verificable</strong><br />Resultados con segmento, archivo original y rango de tiempo cuando están disponibles.</li>
+        <li><strong id="transcripts-title"></strong><br /><span id="transcripts-copy"></span></li>
+        <li><strong id="audio-title"></strong><br /><span id="audio-copy"></span></li>
+        <li><strong id="evidence-title"></strong><br /><span id="evidence-copy"></span></li>
       </ul>
 
-      <p class="startup-note"><strong>Importante:</strong> la primera consulta puede demorar bastante porque inicializa los servicios.</p>
+      <p class="startup-note"><strong id="startup-label"></strong> <span id="startup-copy"></span></p>
 
       <div class="agent-widget-note">
-        <strong>Conversá con el agente →</strong><br />
-        Usá el widget de la esquina inferior derecha para conversar con el agente y hacer búsquedas semánticas en el archivo periodístico.
+        <strong id="agent-title"></strong><br />
+        <span id="agent-copy"></span>
       </div>
 
-      <a class="direct-search-link" href="https://hordiales.github.io/audio-semantic-search-for-journalists/direct-search/?">
-        <strong>Búsqueda directa en distintos índices →</strong><br />
-        Consultá por separado los índices de texto y de audio.
+      <a class="direct-search-link" id="direct-search-link" href="https://hordiales.github.io/audio-semantic-search-for-journalists/direct-search/">
+        <strong id="direct-title"></strong><br />
+        <span id="direct-copy"></span>
       </a>
 
       <div id="audio-search-widget"></div>
+      <script>
+        (() => {
+          const storageKey = "audio-search-locale";
+          const translations = {
+            es: {
+              title: "Búsqueda semántica sobre audios de archivo periodístico",
+              eyebrow: "Herramienta para redacciones",
+              language: "Idioma",
+              heading: "Búsqueda semántica sobre audios de archivo periodístico",
+              lead: "Encontrá declaraciones, temas y eventos acústicos en material sonoro procesado, con referencias al archivo de origen y sus timestamps.",
+              featuresHeading: "Qué puede buscar",
+              transcriptsTitle: "Transcripciones",
+              transcriptsCopy: "Consultas semánticas sobre lo dicho en entrevistas, discursos y grabaciones.",
+              audioTitle: "Eventos de audio",
+              audioCopy: "Búsqueda cross-modal de aplausos, música y otros sonidos mediante CLAP.",
+              evidenceTitle: "Evidencia verificable",
+              evidenceCopy: "Resultados con segmento, archivo original y rango de tiempo cuando están disponibles.",
+              startupLabel: "Importante:",
+              startupCopy: "la primera consulta puede demorar bastante porque inicializa los servicios.",
+              agentTitle: "Conversá con el agente →",
+              agentCopy: "Usá el widget de la esquina inferior derecha para conversar con el agente y hacer búsquedas semánticas en el archivo periodístico.",
+              directTitle: "Búsqueda directa en distintos índices →",
+              directCopy: "Consultá por separado los índices de texto y de audio.",
+            },
+            en: {
+              title: "Semantic Search Across Journalistic Audio Archives",
+              eyebrow: "A tool for newsrooms",
+              language: "Language",
+              heading: "Semantic Search Across Journalistic Audio Archives",
+              lead: "Find statements, topics, and acoustic events in processed audio, with references to the source file and timestamps.",
+              featuresHeading: "What you can search",
+              transcriptsTitle: "Transcripts",
+              transcriptsCopy: "Semantic searches across what was said in interviews, speeches, and recordings.",
+              audioTitle: "Audio events",
+              audioCopy: "Cross-modal search for applause, music, and other sounds through CLAP.",
+              evidenceTitle: "Verifiable evidence",
+              evidenceCopy: "Results include the segment, source file, and time range whenever available.",
+              startupLabel: "Important:",
+              startupCopy: "the first search may take a while while services initialize.",
+              agentTitle: "Talk to the agent →",
+              agentCopy: "Use the widget in the lower-right corner to talk to the agent and search the journalistic archive.",
+              directTitle: "Direct search across indexes →",
+              directCopy: "Search the text and audio indexes separately.",
+            },
+          };
+          const queryLanguage = new URLSearchParams(location.search).get("lang");
+          const storedLanguage = localStorage.getItem(storageKey);
+          const locale = queryLanguage === "en" || queryLanguage === "es" ? queryLanguage : (storedLanguage === "en" || storedLanguage === "es" ? storedLanguage : (navigator.languages.some(language => language.toLowerCase().startsWith("en")) ? "en" : "es"));
+          const selector = document.getElementById("language-selector");
+          const render = (language) => {
+            const copy = translations[language];
+            document.documentElement.lang = language;
+            document.title = copy.title;
+            selector.value = language;
+            const fields = { eyebrow: "eyebrow", "language-label": "language", heading: "heading", lead: "lead", "features-heading": "featuresHeading", "transcripts-title": "transcriptsTitle", "transcripts-copy": "transcriptsCopy", "audio-title": "audioTitle", "audio-copy": "audioCopy", "evidence-title": "evidenceTitle", "evidence-copy": "evidenceCopy", "startup-label": "startupLabel", "startup-copy": "startupCopy", "agent-title": "agentTitle", "agent-copy": "agentCopy", "direct-title": "directTitle", "direct-copy": "directCopy" };
+            Object.entries(fields).forEach(([id, key]) => { document.getElementById(id).textContent = copy[key]; });
+          };
+          selector.addEventListener("change", () => {
+            localStorage.setItem(storageKey, selector.value);
+            render(selector.value);
+            window.dispatchEvent(new CustomEvent("audio-search-locale-change", { detail: selector.value }));
+          });
+          render(locale);
+        })();
+      </script>
       <script type="module" src="./widget/audio-search-widget.js"></script>
     </main>
   </body>

@@ -1,17 +1,18 @@
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { search } from "./api";
+import { detectLocale, persistLocale, ui, type Locale, type UiCopy } from "./i18n";
 import type { IndexResults, SearchIndex, SearchPlan, SearchResponse, SearchResult } from "./types";
 
-const labels: Record<SearchIndex, string> = {
-  text: "Índice de texto",
-  audio: "Índice de audio (CLAP)",
-  yamnet: "Clases de audio (YAMNet)",
-};
-const resultSourceLabels: Record<SearchIndex, string> = {
-  text: "Texto / transcripciones",
-  audio: "Audio / CLAP",
-  yamnet: "Etiquetas YAMNet / AudioSet",
-};
+const indexLabels = (copy: UiCopy): Record<SearchIndex, string> => ({
+  text: copy.indexText,
+  audio: copy.indexAudio,
+  yamnet: copy.indexYamnet,
+});
+const resultSourceLabels = (copy: UiCopy): Record<SearchIndex, string> => ({
+  text: copy.sourceText,
+  audio: copy.sourceAudio,
+  yamnet: copy.sourceYamnet,
+});
 
 const initialUrl = new URLSearchParams(window.location.search);
 const legacyIndex = initialUrl.get("idx");
@@ -50,6 +51,9 @@ function lowScoreWarningThreshold(): number {
 interface PlayerCommand { play: () => void; focus: () => void }
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(detectLocale);
+  const copy = ui[locale];
+  const labels = indexLabels(copy);
   const [query, setQuery] = useState(initialUrl.get("q") ?? "");
   const [includeText, setIncludeText] = useState(initialIncludeText);
   const [includeClap, setIncludeClap] = useState(initialIncludeClap);
@@ -69,6 +73,13 @@ export default function App() {
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [queue, setQueue] = useState<string[] | null>(null);
   const controller = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    persistLocale(locale);
+    document.title = copy.pageTitle;
+  }, [copy.pageTitle, locale]);
+
+  const changeLocale = (value: Locale) => setLocale(value);
 
   const selectedIndexes = useMemo<SearchIndex[]>(
     () => [
@@ -98,7 +109,7 @@ export default function App() {
   const performSearch = useCallback(async (plan?: SearchPlan) => {
     const cleanedQuery = query.trim();
     if (!cleanedQuery) {
-      setError("Escribí una consulta para buscar en el archivo.");
+      setError(copy.searchError);
       return;
     }
     controller.current?.abort();
@@ -117,12 +128,12 @@ export default function App() {
     } finally {
       if (controller.current === nextController) setLoading(false);
     }
-  }, [includeText, includeClap, includeYamnet, k, query, rewrite]);
+  }, [copy.searchError, includeText, includeClap, includeYamnet, k, query, rewrite]);
 
   const onSubmit = (event: FormEvent) => { event.preventDefault(); void performSearch(); };
   const changeSourceInclusion = (source: "text" | "clap" | "yamnet", enabled: boolean) => {
     if (!enabled && selectedIndexes.length === 1) {
-      setError("Elegí al menos un índice para buscar.");
+      setError(copy.minimumIndexError);
       return;
     }
     setError(null);
@@ -208,88 +219,93 @@ export default function App() {
   return (
     <main className="shell">
       <header className="masthead">
-        <p className="eyebrow">Archivo sonoro · búsqueda directa</p>
-        <h1>Encontrá y escuchá la evidencia.</h1>
-        <p className="lede">Los resultados vienen completos del índice. La IA sólo puede proponer cómo buscar.</p>
-        <p className="startup-note"><strong>Importante:</strong> la primera consulta puede demorar bastante porque inicializa los servicios.</p>
+        <div className="masthead-top"><p className="eyebrow">{copy.eyebrow}</p><LanguageSelector locale={locale} copy={copy} onChange={changeLocale} /></div>
+        <h1>{copy.heading}</h1>
+        <p className="lede">{copy.lead}</p>
+        <p className="startup-note"><strong>{copy.startup}</strong> {copy.startupMessage}</p>
       </header>
 
-      <section className="search-panel" aria-label="Búsqueda">
+      <section className="search-panel" aria-label={copy.search}>
         <form onSubmit={onSubmit}>
           <div className="search-line">
-            <label className="sr-only" htmlFor="query">Consulta</label>
-            <input id="query" value={query} onChange={event => setQuery(event.target.value)} placeholder="¿Hay música mientras habla el entrevistado?" autoFocus />
-            <button className="primary" type="submit" disabled={loading}>{loading ? "Buscando…" : "Buscar"}</button>
+            <label className="sr-only" htmlFor="query">{copy.query}</label>
+            <input id="query" value={query} onChange={event => setQuery(event.target.value)} placeholder={copy.queryPlaceholder} autoFocus />
+            <button className="primary" type="submit" disabled={loading}>{loading ? copy.searching : copy.searchButton}</button>
           </div>
           <div className="controls-row">
             <label className={`source-toggle source-toggle-text ${includeText ? "active" : ""}`}>
               <input type="checkbox" checked={includeText} onChange={event => changeSourceInclusion("text", event.target.checked)} />
-              <span><strong>Incluir índice de texto</strong><small>Busca en las transcripciones. Activado por defecto.</small></span>
+              <span><strong>{copy.includeText}</strong><small>{copy.includeTextHelp}</small></span>
             </label>
             <label className={`source-toggle source-toggle-audio ${includeClap ? "active" : ""}`}>
               <input type="checkbox" checked={includeClap} onChange={event => changeSourceInclusion("clap", event.target.checked)} />
-              <span><strong>Incluir índice CLAP</strong><small>Busca sonidos por similitud texto→audio. Desactivado por defecto.</small></span>
+              <span><strong>{copy.includeClap}</strong><small>{copy.includeClapHelp}</small></span>
             </label>
             <label className={`source-toggle source-toggle-yamnet ${includeYamnet ? "active" : ""}`}>
               <input type="checkbox" checked={includeYamnet} onChange={event => changeSourceInclusion("yamnet", event.target.checked)} />
-              <span><strong>Incluir clases YAMNet</strong><small>Filtra por etiquetas AudioSet y score del clasificador. Desactivado por defecto.</small></span>
+              <span><strong>{copy.includeYamnet}</strong><small>{copy.includeYamnetHelp}</small></span>
             </label>
-            <label className="toggle"><input type="checkbox" checked={rewrite} onChange={event => setRewrite(event.target.checked)} /> Reformular con IA</label>
-            <label className="k-picker">Resultados
+            <label className="toggle"><input type="checkbox" checked={rewrite} onChange={event => setRewrite(event.target.checked)} /> {copy.rewrite}</label>
+            <label className="k-picker">{copy.results}
               <select value={k} onChange={event => setK(Number(event.target.value))}>{[5, 10, 20, 50].map(value => <option key={value} value={value}>{value}</option>)}</select>
             </label>
           </div>
         </form>
       </section>
 
-      {response && <PlanPanel plan={draftPlan ?? response.plan} editing={editingPlan} onEdit={() => setEditingPlan(true)} onChange={setDraftPlan} onCancel={() => { setDraftPlan(response.plan); setEditingPlan(false); }} onSave={savePlan} />}
+      {response && <PlanPanel copy={copy} plan={draftPlan ?? response.plan} editing={editingPlan} onEdit={() => setEditingPlan(true)} onChange={setDraftPlan} onCancel={() => { setDraftPlan(response.plan); setEditingPlan(false); }} onSave={savePlan} />}
       {error && <p className="notice error" role="alert">{error}</p>}
-      {loading && <p className="notice">{`Buscando en ${selectedIndexes.map(index => labels[index]).join(", ")}.${includeClap ? " La primera consulta CLAP puede demorar mientras se carga el modelo." : ""}`}</p>}
+      {loading && <p className="notice">{`${copy.searching.replace("…", "")} ${selectedIndexes.map(index => labels[index]).join(", ")}.${includeClap ? copy.loadingClap : ""}`}</p>}
 
       {response && <>
         <div className="result-toolbar">
-          <p><strong>{allResults.length}</strong> resultados · {response.took_ms} ms</p>
-          {allResults.length > 1 && <button className="quiet" onClick={startContinuous}>{queue ? "Reproduciendo ranking…" : "▶ Reproducir todos"}</button>}
+          <p><strong>{allResults.length}</strong> {allResults.length === 1 ? copy.result : copy.resultsPlural} · {response.took_ms} ms</p>
+          {allResults.length > 1 && <button className="quiet" onClick={startContinuous}>{queue ? copy.playing : copy.playAll}</button>}
         </div>
-        <Filters fileFilter={fileFilter} setFileFilter={setFileFilter} fromTime={fromTime} setFromTime={setFromTime} toTime={toTime} setToTime={setToTime} />
-        <section className="result-columns" aria-label="Resultados">
-          {selectedIndexes.map(index => <ResultColumn key={index} index={index} bucket={response.indexes[index]} fileFilter={fileFilter} fromTime={fromTime} toTime={toTime} focusedKey={focusedKey} setFocusedKey={setFocusedKey} requestPlay={requestPlay} registerPlayer={registerPlayer} onPlayerFinished={onPlayerFinished} />)}
+        <Filters copy={copy} fileFilter={fileFilter} setFileFilter={setFileFilter} fromTime={fromTime} setFromTime={setFromTime} toTime={toTime} setToTime={setToTime} />
+        <section className="result-columns" aria-label={copy.results}>
+          {selectedIndexes.map(index => <ResultColumn copy={copy} key={index} index={index} bucket={response.indexes[index]} fileFilter={fileFilter} fromTime={fromTime} toTime={toTime} focusedKey={focusedKey} setFocusedKey={setFocusedKey} requestPlay={requestPlay} registerPlayer={registerPlayer} onPlayerFinished={onPlayerFinished} />)}
         </section>
       </>}
     </main>
   );
 }
 
-function PlanPanel({ plan, editing, onEdit, onChange, onCancel, onSave }: { plan: SearchPlan; editing: boolean; onEdit: () => void; onChange: (value: SearchPlan) => void; onCancel: () => void; onSave: () => void }) {
+function LanguageSelector({ locale, copy, onChange }: { locale: Locale; copy: UiCopy; onChange: (locale: Locale) => void }) {
+  return <label className="language-selector"><span>{copy.language}</span><select value={locale} onChange={event => onChange(event.target.value as Locale)} aria-label={copy.language}><option value="es">{copy.spanish}</option><option value="en">{copy.english}</option></select></label>;
+}
+
+function PlanPanel({ copy, plan, editing, onEdit, onChange, onCancel, onSave }: { copy: UiCopy; plan: SearchPlan; editing: boolean; onEdit: () => void; onChange: (value: SearchPlan) => void; onCancel: () => void; onSave: () => void }) {
   const copyPlan = async () => { await navigator.clipboard?.writeText(JSON.stringify(plan, null, 2)); };
-  return <section className="plan" aria-label="Plan de búsqueda efectivo">
-    <div><p className="eyebrow">Plan efectivo</p><p className="plan-hint">Este plan se puede copiar o reenviar para repetir el retrieval sin síntesis intermedia.</p></div>
+  return <section className="plan" aria-label={copy.effectivePlan}>
+    <div><p className="eyebrow">{copy.effectivePlan}</p><p className="plan-hint">{copy.planHint}</p></div>
     {editing ? <div className="plan-editor">
-      {plan.indexes.includes("text") && <label>Query de texto<input value={plan.text_query ?? ""} onChange={event => onChange({ ...plan, text_query: event.target.value })} /></label>}
-      {plan.indexes.includes("audio") && <><label>Descripción acústica<input value={plan.audio_query ?? ""} onChange={event => onChange({ ...plan, audio_query: event.target.value, audio_query_en: undefined })} /></label>{plan.audio_query_en && <p className="translated-plan">Traducción inglesa fijada para repetir este plan: “{plan.audio_query_en}”. Al editar la descripción, el servicio generará una nueva.</p>}</>}
-      {plan.indexes.includes("yamnet") && <><label>Clases acústicas YAMNet<input value={plan.yamnet_query ?? ""} onChange={event => onChange({ ...plan, yamnet_query: event.target.value, yamnet_query_en: undefined })} /></label>{plan.yamnet_query_en && <p className="translated-plan">Query inglesa de clases fijada para repetir este plan: “{plan.yamnet_query_en}”. Al editarla, el servicio generará una nueva.</p>}</>}
-      <div className="inline-actions"><button className="primary" onClick={onSave}>Aplicar plan</button><button className="quiet" onClick={onCancel}>Cancelar</button></div>
+      {plan.indexes.includes("text") && <label>{copy.textQuery}<input value={plan.text_query ?? ""} onChange={event => onChange({ ...plan, text_query: event.target.value })} /></label>}
+      {plan.indexes.includes("audio") && <><label>{copy.acousticDescription}<input value={plan.audio_query ?? ""} onChange={event => onChange({ ...plan, audio_query: event.target.value, audio_query_en: undefined })} /></label>{plan.audio_query_en && <p className="translated-plan">{copy.fixedClapTranslation} “{plan.audio_query_en}”. {copy.updateDescription}</p>}</>}
+      {plan.indexes.includes("yamnet") && <><label>{copy.yamnetClasses}<input value={plan.yamnet_query ?? ""} onChange={event => onChange({ ...plan, yamnet_query: event.target.value, yamnet_query_en: undefined })} /></label>{plan.yamnet_query_en && <p className="translated-plan">{copy.fixedYamnetTranslation} “{plan.yamnet_query_en}”. {copy.updateYamnet}</p>}</>}
+      <div className="inline-actions"><button className="primary" onClick={onSave}>{copy.applyPlan}</button><button className="quiet" onClick={onCancel}>{copy.cancel}</button></div>
     </div> : <div className="plan-summary">
-      {plan.text_query && <span><b>Texto</b> “{plan.text_query}”</span>}
-      {plan.audio_query && <span><b>Audio</b> “{plan.audio_query}”</span>}
-      {plan.audio_query_en && <span className="translation">CLAP buscó en inglés: “{plan.audio_query_en}”</span>}
+      {plan.text_query && <span><b>{copy.text}</b> “{plan.text_query}”</span>}
+      {plan.audio_query && <span><b>{copy.audio}</b> “{plan.audio_query}”</span>}
+      {plan.audio_query_en && <span className="translation">{copy.clapSearchedEnglish} “{plan.audio_query_en}”</span>}
       {plan.yamnet_query && <span><b>YAMNet</b> “{plan.yamnet_query}”</span>}
-      {plan.yamnet_query_en && <span className="translation">YAMNet buscó clases en inglés: “{plan.yamnet_query_en}”</span>}
+      {plan.yamnet_query_en && <span className="translation">{copy.yamnetSearchedEnglish} “{plan.yamnet_query_en}”</span>}
       {plan.rationale && <span className="rationale">{plan.rationale}</span>}
-      <button className="quiet" onClick={() => void copyPlan()}>Copiar plan</button><button className="quiet" onClick={onEdit}>Editar plan</button>
+      <button className="quiet" onClick={() => void copyPlan()}>{copy.copyPlan}</button><button className="quiet" onClick={onEdit}>{copy.editPlan}</button>
     </div>}
   </section>;
 }
 
-function Filters({ fileFilter, setFileFilter, fromTime, setFromTime, toTime, setToTime }: { fileFilter: string; setFileFilter: (value: string) => void; fromTime: string; setFromTime: (value: string) => void; toTime: string; setToTime: (value: string) => void }) {
-  return <div className="filters" aria-label="Filtros de resultados">
-    <label>Archivo<input value={fileFilter} onChange={event => setFileFilter(event.target.value)} placeholder="Filtrar por nombre" /></label>
-    <label>Desde (s)<input type="number" min="0" value={fromTime} onChange={event => setFromTime(event.target.value)} /></label>
-    <label>Hasta (s)<input type="number" min="0" value={toTime} onChange={event => setToTime(event.target.value)} /></label>
+function Filters({ copy, fileFilter, setFileFilter, fromTime, setFromTime, toTime, setToTime }: { copy: UiCopy; fileFilter: string; setFileFilter: (value: string) => void; fromTime: string; setFromTime: (value: string) => void; toTime: string; setToTime: (value: string) => void }) {
+  return <div className="filters" aria-label={copy.resultFilters}>
+    <label>{copy.file}<input value={fileFilter} onChange={event => setFileFilter(event.target.value)} placeholder={copy.filePlaceholder} /></label>
+    <label>{copy.from}<input type="number" min="0" value={fromTime} onChange={event => setFromTime(event.target.value)} /></label>
+    <label>{copy.until}<input type="number" min="0" value={toTime} onChange={event => setToTime(event.target.value)} /></label>
   </div>;
 }
 
-function ResultColumn({ index, bucket, fileFilter, fromTime, toTime, focusedKey, setFocusedKey, requestPlay, registerPlayer, onPlayerFinished }: { index: SearchIndex; bucket?: IndexResults; fileFilter: string; fromTime: string; toTime: string; focusedKey: string | null; setFocusedKey: (key: string) => void; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onPlayerFinished: (key: string) => void }) {
+function ResultColumn({ copy, index, bucket, fileFilter, fromTime, toTime, focusedKey, setFocusedKey, requestPlay, registerPlayer, onPlayerFinished }: { copy: UiCopy; index: SearchIndex; bucket?: IndexResults; fileFilter: string; fromTime: string; toTime: string; focusedKey: string | null; setFocusedKey: (key: string) => void; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onPlayerFinished: (key: string) => void }) {
+  const labels = indexLabels(copy);
   const [open, setOpen] = useState(true);
   const results = (bucket?.results ?? []).filter(result => {
     const matchesFile = result.original_file_name.toLocaleLowerCase().includes(fileFilter.toLocaleLowerCase());
@@ -304,41 +320,43 @@ function ResultColumn({ index, bucket, fileFilter, fromTime, toTime, focusedKey,
     <header>
       <button className="column-toggle" type="button" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen(current => !current)}>
         <span className="column-heading"><span className={`source-badge source-${index}`}>{labels[index]}</span><strong>{results.length} resultado{results.length === 1 ? "" : "s"}</strong></span>
-        <span className="collapse-indicator" aria-hidden="true">{open ? "Ocultar" : "Mostrar"} <b>{open ? "−" : "+"}</b></span>
+        <span className="collapse-indicator" aria-hidden="true">{open ? copy.hide : copy.show} <b>{open ? "−" : "+"}</b></span>
       </button>
-      {bucket?.effective_query && <p className="effective-query">Query: “{bucket.effective_query}”</p>}
-      {index !== "text" && bucket?.translated_query && <p className="effective-query">En inglés: “{bucket.translated_query}”</p>}
+      {bucket?.effective_query && <p className="effective-query">{copy.queryLabel} “{bucket.effective_query}”</p>}
+      {index !== "text" && bucket?.translated_query && <p className="effective-query">{copy.inEnglish} “{bucket.translated_query}”</p>}
     </header>
     {open && <div className="result-column-body" id={contentId}>
-      {!bucket ? <p className="empty">No se recibió una respuesta para este índice.</p> : !bucket.available ? <p className="notice error">No se pudo consultar este índice ahora.{bucket.error ? ` ${bucket.error}` : ""}</p> : bucket.error ? <p className="notice error">{bucket.error}</p> : threshold !== undefined && results[0] && results[0].similarity < threshold ? <p className="notice">Coincidencias débiles: probablemente no haya buenos ejemplos en el corpus.</p> : null}
-      {bucket?.available && !bucket.error && results.length === 0 && <p className="empty">No hay resultados que coincidan con estos filtros.</p>}
-      <div className="cards">{results.map(result => <ResultCard key={resultKey(index, result)} result={result} index={index} topSimilarity={topSimilarity} focused={focusedKey === resultKey(index, result)} onFocus={() => setFocusedKey(resultKey(index, result))} requestPlay={requestPlay} registerPlayer={registerPlayer} onPlayerFinished={onPlayerFinished} />)}</div>
+      {!bucket ? <p className="empty">{copy.noIndexResponse}</p> : !bucket.available ? <p className="notice error">{copy.indexUnavailable}{bucket.error ? ` ${bucket.error}` : ""}</p> : bucket.error ? <p className="notice error">{bucket.error}</p> : threshold !== undefined && results[0] && results[0].similarity < threshold ? <p className="notice">{copy.weakMatches}</p> : null}
+      {bucket?.available && !bucket.error && results.length === 0 && <p className="empty">{copy.noFilteredResults}</p>}
+      <div className="cards">{results.map(result => <ResultCard copy={copy} key={resultKey(index, result)} result={result} index={index} topSimilarity={topSimilarity} focused={focusedKey === resultKey(index, result)} onFocus={() => setFocusedKey(resultKey(index, result))} requestPlay={requestPlay} registerPlayer={registerPlayer} onPlayerFinished={onPlayerFinished} />)}</div>
     </div>}
   </section>;
 }
 
-function ResultCard({ result, index, topSimilarity, focused, onFocus, requestPlay, registerPlayer, onPlayerFinished }: { result: SearchResult; index: SearchIndex; topSimilarity: number; focused: boolean; onFocus: () => void; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onPlayerFinished: (key: string) => void }) {
+function ResultCard({ copy, result, index, topSimilarity, focused, onFocus, requestPlay, registerPlayer, onPlayerFinished }: { copy: UiCopy; result: SearchResult; index: SearchIndex; topSimilarity: number; focused: boolean; onFocus: () => void; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onPlayerFinished: (key: string) => void }) {
+  const labels = indexLabels(copy);
+  const sources = resultSourceLabels(copy);
   const key = resultKey(index, result);
   const citation = `${result.original_file_name} · ${asTime(result.start_time)}–${asTime(result.end_time)} · segment_id ${result.segment_id} · índice ${result.search_index_label ?? labels[index]}`;
   const normalized = topSimilarity > 0 ? Math.max(0, Math.min(100, (result.similarity / topSimilarity) * 100)) : 0;
   const isLowScore = result.similarity < lowScoreWarningThreshold();
   const scoreHelp = index === "yamnet"
-    ? "Score de ranking: cobertura de términos AudioSet × confianza media de las clases YAMNet coincidentes."
-    : "Similitud coseno. Los valores de CLAP y de texto no son comparables entre sí.";
+    ? copy.yamnetScoreHelp
+    : copy.similarityHelp;
   const copyCitation = async () => { await navigator.clipboard?.writeText(citation); };
   return <article className={`result-card${focused ? " is-focused" : ""}${isLowScore ? " is-low-score" : ""}`} tabIndex={0} onFocus={onFocus}>
-    <div className="card-top"><span className={`source-badge source-${index}`} title="Origen del resultado">{resultSourceLabels[index]}</span><span className="rank">#{result.rank}</span><div className={`score${isLowScore ? " is-low" : ""}`} title={scoreHelp}><span><i style={{ width: `${normalized}%` }} /></span><small>{result.similarity.toFixed(3)}</small></div>{isLowScore && <span className="low-score-warning" title={`Score menor a ${lowScoreWarningThreshold().toFixed(2)}: revisar el resultado antes de usarlo.`}>Score bajo</span>}</div>
+    <div className="card-top"><span className={`source-badge source-${index}`} title={copy.resultOrigin}>{sources[index]}</span><span className="rank">#{result.rank}</span><div className={`score${isLowScore ? " is-low" : ""}`} title={scoreHelp}><span><i style={{ width: `${normalized}%` }} /></span><small>{result.similarity.toFixed(3)}</small></div>{isLowScore && <span className="low-score-warning" title={copy.reviewScore.replace("{threshold}", lowScoreWarningThreshold().toFixed(2))}>{copy.lowScore}</span>}</div>
     <h3 title={result.original_file_name}>{result.original_file_name}</h3>
     <p className="timestamp">{asTime(result.start_time)} → {asTime(result.end_time)} <span>({Math.round(result.duration ?? result.end_time - result.start_time)} s)</span></p>
-    {result.yamnet_audio_classes?.length ? <p className="yamnet"><b>Etiquetas AudioSet</b> {result.yamnet_audio_classes.slice(0, 3).map(item => `${item.label ?? item.class_name ?? "event"} ${item.score.toFixed(2)}`).join(" · ")}</p> : null}
-    {result.clip_url ? <AudioPlayer id={key} result={result} preload={result.rank === 1} requestPlay={requestPlay} registerPlayer={registerPlayer} onFinished={() => onPlayerFinished(key)} /> : <p className="missing-audio">Clip no disponible para este segmento.</p>}
-    <p className="transcript">“{result.text || "Sin transcripción disponible."}”</p>
-    {index === "yamnet" && result.yamnet_matched_classes?.length ? <p className="yamnet matched"><b>Coincidencias</b> {result.yamnet_matched_classes.map(item => `${item.label ?? item.class_name ?? "event"} ${item.score.toFixed(2)}`).join(" · ")}</p> : null}
-    <div className="card-actions"><button className="quiet" onClick={() => void copyCitation()}>Copiar cita</button>{result.clip_url && <a className="quiet" href={result.clip_url} download={`segment_${result.segment_id}.opus`}>Descargar</a>}<span title={citation}>ID {result.segment_id}</span></div>
+    {result.yamnet_audio_classes?.length ? <p className="yamnet"><b>{copy.audioSetLabels}</b> {result.yamnet_audio_classes.slice(0, 3).map(item => `${item.label ?? item.class_name ?? "event"} ${item.score.toFixed(2)}`).join(" · ")}</p> : null}
+    {result.clip_url ? <AudioPlayer copy={copy} id={key} result={result} preload={result.rank === 1} requestPlay={requestPlay} registerPlayer={registerPlayer} onFinished={() => onPlayerFinished(key)} /> : <p className="missing-audio">{copy.audioUnavailable}</p>}
+    <p className="transcript">“{result.text || copy.noTranscript}”</p>
+    {index === "yamnet" && result.yamnet_matched_classes?.length ? <p className="yamnet matched"><b>{copy.matches}</b> {result.yamnet_matched_classes.map(item => `${item.label ?? item.class_name ?? "event"} ${item.score.toFixed(2)}`).join(" · ")}</p> : null}
+    <div className="card-actions"><button className="quiet" onClick={() => void copyCitation()}>{copy.copyCitation}</button>{result.clip_url && <a className="quiet" href={result.clip_url} download={`segment_${result.segment_id}.opus`}>{copy.download}</a>}<span title={citation}>ID {result.segment_id}</span></div>
   </article>;
 }
 
-function AudioPlayer({ id, result, preload, requestPlay, registerPlayer, onFinished }: { id: string; result: SearchResult; preload: boolean; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onFinished: () => void }) {
+function AudioPlayer({ copy, id, result, preload, requestPlay, registerPlayer, onFinished }: { copy: UiCopy; id: string; result: SearchResult; preload: boolean; requestPlay: (audio: HTMLAudioElement) => void; registerPlayer: (key: string, command: PlayerCommand | null) => void; onFinished: () => void }) {
   const audio = useRef<HTMLAudioElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [context, setContext] = useState(false);
@@ -363,9 +381,9 @@ function AudioPlayer({ id, result, preload, requestPlay, registerPlayer, onFinis
   const toggle = () => { if (audio.current?.paused) play(); else audio.current?.pause(); };
   return <div className="audio-player" ref={root} tabIndex={-1}>
     <audio ref={audio} preload={preload ? "auto" : "metadata"} src={`${result.clip_url}#t=${startOffset},${endOffset}`} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={event => { const time = event.currentTarget.currentTime; setPosition(time); if (time >= endOffset) { event.currentTarget.pause(); onFinished(); } }} onEnded={onFinished} />
-    <button className="play" onClick={toggle} aria-label={playing ? "Pausar segmento" : "Reproducir segmento"}>{playing ? "❚❚" : "▶"}</button>
-    <input aria-label="Progreso de audio" type="range" min={startOffset} max={endOffset} step="0.1" value={Math.min(Math.max(position, startOffset), endOffset)} style={{ "--progress": `${progress}%` } as CSSProperties} onChange={event => { const value = Number(event.target.value); if (audio.current) audio.current.currentTime = value; setPosition(value); }} />
+    <button className="play" onClick={toggle} aria-label={playing ? copy.pauseSegment : copy.playSegment}>{playing ? "❚❚" : "▶"}</button>
+    <input aria-label={copy.audioProgress} type="range" min={startOffset} max={endOffset} step="0.1" value={Math.min(Math.max(position, startOffset), endOffset)} style={{ "--progress": `${progress}%` } as CSSProperties} onChange={event => { const value = Number(event.target.value); if (audio.current) audio.current.currentTime = value; setPosition(value); }} />
     <time>{asTime(Math.max(0, position - startOffset))}</time>
-    <button className={`context ${context ? "active" : ""}`} onClick={() => setContext(value => !value)} title="Extiende la escucha diez segundos a cada lado">±10 s</button>
+    <button className={`context ${context ? "active" : ""}`} onClick={() => setContext(value => !value)} title={copy.extendListening}>±10 s</button>
   </div>;
 }
