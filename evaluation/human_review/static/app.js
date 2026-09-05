@@ -5,9 +5,39 @@ const state = {
   annotations: new Map(),
 };
 
+const localeKey = "audio-search-locale";
+const translations = {
+  es: {
+    title: "Búsqueda semántica sobre audios de archivo periodístico", eyebrow: "Evaluación humana", heading: "Retrieval acústico periodístico", language: "Idioma", reviewer: "Revisor", export: "Exportar JSON", saved: "juicios guardados", questions: "consultas", previous: "Consulta anterior", next: "Consulta siguiente", clapQuery: "Consulta enviada al encoder textual de CLAP", target: "Evento o propiedad buscada", method: "El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar relevancia; no uses la transcripción como sustituto del sonido.", candidate: "Candidato", segment: "Segmento", originalRank: "rank original", source: "Fuente", time: "Tiempo", transcript: "Transcripción auxiliar", relevance: "Relevancia para la consulta", grades: ["Irrelevante", "Tangencial", "Relevante", "Directa"], eventPresent: "¿Está presente el evento?", unknown: "No se puede determinar", yes: "Sí", no: "No", confidence: "Confianza", confidenceValues: ["Muy baja", "Baja", "Media", "Alta", "Muy alta"], notes: "Notas", notesPlaceholder: "Ambigüedades, sonidos concurrentes o motivo de la decisión", save: "Guardar y continuar", savedStatus: "Juicio ya guardado", saving: "Guardando…", saveError: "No se pudo guardar", loadError: "No se pudo cargar la muestra de revisión", transcriptMissing: "Sin transcripción", yamnetOn: "disponible", yamnetOff: "no activo",
+  },
+  en: {
+    title: "Semantic Search Across Journalistic Audio Archives", eyebrow: "Human review", heading: "Journalistic acoustic retrieval", language: "Language", reviewer: "Reviewer", export: "Export JSON", saved: "saved judgments", questions: "queries", previous: "Previous query", next: "Next query", clapQuery: "Query sent to CLAP's text encoder", target: "Sought event or property", method: "The ranking is only a candidate selection. Listen to the audio before assigning relevance; do not use the transcript as a substitute for sound.", candidate: "Candidate", segment: "Segment", originalRank: "original rank", source: "Source", time: "Time", transcript: "Supporting transcript", relevance: "Relevance to the query", grades: ["Irrelevant", "Tangential", "Relevant", "Direct"], eventPresent: "Is the event present?", unknown: "Cannot determine", yes: "Yes", no: "No", confidence: "Confidence", confidenceValues: ["Very low", "Low", "Medium", "High", "Very high"], notes: "Notes", notesPlaceholder: "Ambiguities, concurrent sounds, or rationale for the decision", save: "Save and continue", savedStatus: "Judgment already saved", saving: "Saving…", saveError: "Could not save", loadError: "Could not load the review sample", transcriptMissing: "No transcript", yamnetOn: "available", yamnetOff: "inactive",
+  },
+};
+const browserLocale = () => navigator.languages.some((language) => language.toLowerCase().startsWith("en")) ? "en" : "es";
+let locale = (() => { const saved = localStorage.getItem(localeKey); return saved === "en" || saved === "es" ? saved : browserLocale(); })();
+const copy = () => translations[locale];
+
 const byId = (id) => document.getElementById(id);
 const annotationKey = (reviewer, caseId, segmentId) => `${reviewer}:${caseId}:${segmentId}`;
 const currentReviewer = () => byId("reviewer").value || "anonymous";
+
+function renderLanguage() {
+  const t = copy();
+  document.documentElement.lang = locale;
+  document.title = t.title;
+  byId("language-selector").value = locale;
+  const fields = { eyebrow: t.eyebrow, "page-heading": t.heading, "language-label": t.language, "reviewer-label": t.reviewer, "export-link": t.export, "saved-label": t.saved, "questions-label": t.questions, "clap-query-label": t.clapQuery, "target-label": t.target, "method-note": t.method, "candidate-label": t.candidate, "segment-label": t.segment, "original-rank-label": t.originalRank, "source-label": t.source, "time-label": t.time, "transcript-label": t.transcript, "relevance-label": t.relevance, "event-present-label": t.eventPresent, "confidence-label": t.confidence, "notes-label": t.notes, "save-button": t.save };
+  Object.entries(fields).forEach(([id, value]) => { byId(id).textContent = value; });
+  t.grades.forEach((value, index) => { byId(`grade-${index}`).textContent = value; });
+  byId("event-unknown").textContent = t.unknown;
+  byId("event-yes").textContent = t.yes;
+  byId("event-no").textContent = t.no;
+  t.confidenceValues.forEach((value, index) => { byId(`confidence-${index + 1}`).textContent = `${index + 1} · ${value}`; });
+  byId("notes").placeholder = t.notesPlaceholder;
+  byId("previous-query").title = t.previous;
+  byId("next-query").title = t.next;
+}
 
 function currentCase() {
   return state.data.cases[state.queryIndex];
@@ -53,7 +83,7 @@ function restoreAnnotation() {
     annotation.event_present === null ? "unknown" : String(annotation.event_present);
   byId("confidence").value = String(annotation.confidence);
   byId("notes").value = annotation.notes || "";
-  byId("save-status").textContent = "Juicio ya guardado";
+  byId("save-status").textContent = copy().savedStatus;
 }
 
 function render() {
@@ -72,7 +102,7 @@ function render() {
   byId("original-rank").textContent = candidate.rank;
   byId("source").textContent = segment.original_file_name;
   byId("time-range").textContent = `${formatTime(segment.start_time)}–${formatTime(segment.end_time)}`;
-  byId("transcript").textContent = segment.text || "Sin transcripción";
+  byId("transcript").textContent = segment.text || copy().transcriptMissing;
   byId("audio").src = segment.clip_url;
   clearForm();
   restoreAnnotation();
@@ -117,14 +147,14 @@ async function saveAnnotation(event) {
     notes: byId("notes").value,
     reviewer: byId("reviewer").value || "anonymous",
   };
-  byId("save-status").textContent = "Guardando…";
+  byId("save-status").textContent = copy().saving;
   const response = await fetch("/api/annotations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    byId("save-status").textContent = "No se pudo guardar";
+    byId("save-status").textContent = copy().saveError;
     return;
   }
   const result = await response.json();
@@ -138,7 +168,7 @@ async function saveAnnotation(event) {
 
 async function initialize() {
   const response = await fetch("/api/review-set");
-  if (!response.ok) throw new Error("No se pudo cargar la muestra de revisión");
+  if (!response.ok) throw new Error(copy().loadError);
   state.data = await response.json();
   state.data.saved_annotations.forEach((annotation) => {
     state.annotations.set(
@@ -148,8 +178,8 @@ async function initialize() {
   });
   byId("question-count").textContent = state.data.sample_composition.questions;
   byId("yamnet-status").textContent = state.data.configuration.yamnet_available
-    ? "disponible"
-    : "no activo";
+    ? copy().yamnetOn
+    : copy().yamnetOff;
   render();
 }
 
@@ -157,6 +187,12 @@ byId("annotation-form").addEventListener("submit", saveAnnotation);
 byId("previous-query").addEventListener("click", () => moveQuery(-1));
 byId("next-query").addEventListener("click", () => moveQuery(1));
 byId("reviewer").addEventListener("change", render);
+byId("language-selector").addEventListener("change", (event) => {
+  locale = event.target.value === "en" ? "en" : "es";
+  localStorage.setItem(localeKey, locale);
+  renderLanguage();
+  if (state.data) render();
+});
 document.addEventListener("keydown", (event) => {
   if (["0", "1", "2", "3"].includes(event.key) && document.activeElement.tagName !== "TEXTAREA") {
     const radio = document.querySelector(`input[name="relevance"][value="${event.key}"]`);
@@ -166,6 +202,7 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "ArrowLeft") moveCandidate(-1);
 });
 
+renderLanguage();
 initialize().catch((error) => {
   byId("question").textContent = error.message;
 });

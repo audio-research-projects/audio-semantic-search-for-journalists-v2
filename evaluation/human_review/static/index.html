@@ -9,19 +9,20 @@
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">Evaluación humana</p>
-        <h1>Retrieval acústico periodístico</h1>
+        <p class="eyebrow" id="eyebrow">Evaluación humana</p>
+        <h1 id="page-heading">Retrieval acústico periodístico</h1>
       </div>
       <div class="header-actions">
-        <label>Revisor <input id="reviewer" value="anonymous" /></label>
-        <a class="button secondary" href="/api/export">Exportar JSON</a>
+        <label><span id="reviewer-label">Revisor</span> <input id="reviewer" value="anonymous" /></label>
+        <label class="language-selector"><span id="language-label">Idioma</span><select id="language-selector"><option value="es">Español</option><option value="en">English</option></select></label>
+        <a class="button secondary" href="/api/export" id="export-link">Exportar JSON</a>
       </div>
     </header>
 
     <main>
       <section class="status-panel">
-        <div><span id="progress-count">0 / 0</span><small>juicios guardados</small></div>
-        <div><span id="question-count">0</span><small>consultas</small></div>
+        <div><span id="progress-count">0 / 0</span><small id="saved-label">juicios guardados</small></div>
+        <div><span id="question-count">0</span><small id="questions-label">consultas</small></div>
         <div><span id="yamnet-status">—</span><small>YAMNet</small></div>
         <div class="progress-track"><div id="progress-bar"></div></div>
       </section>
@@ -36,74 +37,71 @@
           <p id="category" class="pill"></p>
           <h2 id="question">Cargando…</h2>
           <div class="query-box">
-            <small>Consulta enviada al encoder textual de CLAP</small>
+            <small id="clap-query-label">Consulta enviada al encoder textual de CLAP</small>
             <p id="clap-query"></p>
           </div>
           <div class="query-box target">
-            <small>Evento o propiedad buscada</small>
+            <small id="target-label">Evento o propiedad buscada</small>
             <p id="target-description"></p>
           </div>
-          <p class="method-note">
-            El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar
-            relevancia; no uses la transcripción como sustituto del sonido.
-          </p>
+          <p class="method-note" id="method-note">El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar relevancia; no uses la transcripción como sustituto del sonido.</p>
         </aside>
 
         <article class="candidate-card">
           <div class="candidate-heading">
             <div>
-              <p class="eyebrow">Candidato <span id="candidate-position"></span></p>
-              <h3>Segmento <span id="segment-id"></span></h3>
+              <p class="eyebrow"><span id="candidate-label">Candidato</span> <span id="candidate-position"></span></p>
+              <h3><span id="segment-label">Segmento</span> <span id="segment-id"></span></h3>
             </div>
             <div class="score"><small>score CLAP</small><strong id="similarity"></strong></div>
           </div>
-          <p class="candidate-stratum"><span id="stratum"></span> · rank original <b id="original-rank"></b></p>
+          <p class="candidate-stratum"><span id="stratum"></span> · <span id="original-rank-label">rank original</span> <b id="original-rank"></b></p>
 
           <audio id="audio" controls preload="metadata"></audio>
           <dl class="metadata">
-            <div><dt>Fuente</dt><dd id="source"></dd></div>
-            <div><dt>Tiempo</dt><dd id="time-range"></dd></div>
-            <div><dt>Transcripción auxiliar</dt><dd id="transcript"></dd></div>
+            <div><dt id="source-label">Fuente</dt><dd id="source"></dd></div>
+            <div><dt id="time-label">Tiempo</dt><dd id="time-range"></dd></div>
+            <div><dt id="transcript-label">Transcripción auxiliar</dt><dd id="transcript"></dd></div>
           </dl>
 
           <form id="annotation-form">
             <fieldset>
-              <legend>Relevancia para la consulta</legend>
+              <legend id="relevance-label">Relevancia para la consulta</legend>
               <div class="grade-grid">
-                <label><input type="radio" name="relevance" value="0" required /><b>0</b> Irrelevante</label>
-                <label><input type="radio" name="relevance" value="1" /><b>1</b> Tangencial</label>
-                <label><input type="radio" name="relevance" value="2" /><b>2</b> Relevante</label>
-                <label><input type="radio" name="relevance" value="3" /><b>3</b> Directa</label>
+                <label><input type="radio" name="relevance" value="0" required /><b>0</b> <span id="grade-0">Irrelevante</span></label>
+                <label><input type="radio" name="relevance" value="1" /><b>1</b> <span id="grade-1">Tangencial</span></label>
+                <label><input type="radio" name="relevance" value="2" /><b>2</b> <span id="grade-2">Relevante</span></label>
+                <label><input type="radio" name="relevance" value="3" /><b>3</b> <span id="grade-3">Directa</span></label>
               </div>
             </fieldset>
 
             <div class="form-row">
               <label>
-                ¿Está presente el evento?
+                <span id="event-present-label">¿Está presente el evento?</span>
                 <select id="event-present">
-                  <option value="unknown">No se puede determinar</option>
-                  <option value="true">Sí</option>
-                  <option value="false">No</option>
+                  <option value="unknown" id="event-unknown">No se puede determinar</option>
+                  <option value="true" id="event-yes">Sí</option>
+                  <option value="false" id="event-no">No</option>
                 </select>
               </label>
               <label>
-                Confianza
+                <span id="confidence-label">Confianza</span>
                 <select id="confidence">
-                  <option value="1">1 · Muy baja</option>
-                  <option value="2">2 · Baja</option>
-                  <option value="3" selected>3 · Media</option>
-                  <option value="4">4 · Alta</option>
-                  <option value="5">5 · Muy alta</option>
+                  <option value="1" id="confidence-1">1 · Muy baja</option>
+                  <option value="2" id="confidence-2">2 · Baja</option>
+                  <option value="3" selected id="confidence-3">3 · Media</option>
+                  <option value="4" id="confidence-4">4 · Alta</option>
+                  <option value="5" id="confidence-5">5 · Muy alta</option>
                 </select>
               </label>
             </div>
             <label>
-              Notas
+              <span id="notes-label">Notas</span>
               <textarea id="notes" rows="3" placeholder="Ambigüedades, sonidos concurrentes o motivo de la decisión"></textarea>
             </label>
             <div class="form-actions">
               <span id="save-status"></span>
-              <button type="submit" class="button primary">Guardar y continuar</button>
+              <button type="submit" class="button primary" id="save-button">Guardar y continuar</button>
             </div>
           </form>
         </article>
