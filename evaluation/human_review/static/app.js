@@ -11,7 +11,7 @@ const translations = {
     title: "Búsqueda semántica sobre audios de archivo periodístico", eyebrow: "Evaluación humana", heading: "Retrieval acústico periodístico", language: "Idioma", reviewer: "Revisor", export: "Exportar JSON", saved: "juicios guardados", questions: "consultas", previous: "Consulta anterior", next: "Consulta siguiente", nextPending: "Próxima consulta pendiente", clapQuery: "Consulta enviada al encoder textual de CLAP", target: "Evento o propiedad buscada", method: "El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar relevancia; no uses la transcripción como sustituto del sonido.", candidate: "Candidato", segment: "Segmento", originalRank: "rank original", source: "Fuente", time: "Tiempo", transcript: "Transcripción auxiliar", relevance: "Relevancia para la consulta", grades: ["Irrelevante", "Tangencial", "Relevante", "Directa"], eventPresent: "¿Está presente el evento?", unknown: "No se puede determinar", yes: "Sí", no: "No", confidence: "Confianza", confidenceValues: ["Muy baja", "Baja", "Media", "Alta", "Muy alta"], notes: "Notas", notesPlaceholder: "Ambigüedades, sonidos concurrentes o motivo de la decisión", save: "Guardar y continuar",
     help: "Ayuda",
     helpTitle: "Atajos de teclado",
-    helpNote: "En fragmentos nuevos, la relevancia inicia preseleccionada en 2 · Relevante.",
+    helpNote: "La relevancia debe elegirse para cada fragmento; no hay valor preseleccionado.",
     shortcuts: [
       ["Q / W / E / R", "Asignar relevancia 0 – 3"],
       ["1 – 5", "Asignar confianza"],
@@ -28,7 +28,7 @@ const translations = {
     title: "Semantic Search Across Journalistic Audio Archives", eyebrow: "Human review", heading: "Journalistic acoustic retrieval", language: "Language", reviewer: "Reviewer", export: "Export JSON", saved: "saved judgments", questions: "queries", previous: "Previous query", next: "Next query", nextPending: "Next pending query", clapQuery: "Query sent to CLAP's text encoder", target: "Sought event or property", method: "The ranking is only a candidate selection. Listen to the audio before assigning relevance; do not use the transcript as a substitute for sound.", candidate: "Candidate", segment: "Segment", originalRank: "original rank", source: "Source", time: "Time", transcript: "Supporting transcript", relevance: "Relevance to the query", grades: ["Irrelevant", "Tangential", "Relevant", "Direct"], eventPresent: "Is the event present?", unknown: "Cannot determine", yes: "Yes", no: "No", confidence: "Confidence", confidenceValues: ["Very low", "Low", "Medium", "High", "Very high"], notes: "Notes", notesPlaceholder: "Ambiguities, concurrent sounds, or rationale for the decision", save: "Save and continue",
     help: "Help",
     helpTitle: "Keyboard shortcuts",
-    helpNote: "For new fragments, relevance starts preselected at 2 · Relevant.",
+    helpNote: "Relevance must be chosen for each fragment; there is no preselected value.",
     shortcuts: [
       ["Q / W / E / R", "Assign relevance 0 – 3"],
       ["1 – 5", "Assign confidence"],
@@ -104,7 +104,7 @@ function updateProgress() {
 
 function clearForm() {
   document.querySelectorAll('input[name="relevance"]').forEach((input) => {
-    input.checked = input.value === "2";
+    input.checked = false;
   });
   byId("event-present").value = "unknown";
   byId("confidence").value = "3";

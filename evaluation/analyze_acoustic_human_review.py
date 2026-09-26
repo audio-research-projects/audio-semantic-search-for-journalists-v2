@@ -25,8 +25,30 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def analyze_annotations(review_set: dict, annotation_data: dict) -> dict:
-    annotations = annotation_data.get("annotations", [])
+def effective_relevance(annotation: dict, *, event_absent_as_irrelevant: bool) -> int:
+    """Return the grade used for metrics, optionally zeroing contradictory positives."""
+    relevance = int(annotation["relevance"])
+    if event_absent_as_irrelevant and annotation.get("event_present") is False and relevance >= 2:
+        return 0
+    return relevance
+
+
+def analyze_annotations(
+    review_set: dict, annotation_data: dict, *, event_absent_as_irrelevant: bool = False
+) -> dict:
+    annotations = [
+        {
+            **annotation,
+            "relevance": effective_relevance(
+                annotation, event_absent_as_irrelevant=event_absent_as_irrelevant
+            ),
+        }
+        for annotation in annotation_data.get("annotations", [])
+    ]
+    recoded = sum(
+        int(original["relevance"]) != derived["relevance"]
+        for original, derived in zip(annotation_data.get("annotations", []), annotations, strict=True)
+    )
     judgments: dict[tuple[str, int], list[dict]] = defaultdict(list)
     for annotation in annotations:
         judgments[(annotation["eval_case_id"], int(annotation["segment_id"]))].append(annotation)
@@ -75,6 +97,10 @@ def analyze_annotations(review_set: dict, annotation_data: dict) -> dict:
 
     return {
         "protocol": review_set.get("review_protocol"),
+        "relevance_rule": {
+            "event_absent_as_irrelevant": event_absent_as_irrelevant,
+            "recoded_judgments": recoded,
+        },
         "annotation_count": len(annotations),
         "reviewers": sorted({item.get("reviewer", "anonymous") for item in annotations}),
         "complete_top_k_cases": len(complete_cases),
@@ -115,11 +141,17 @@ def main() -> None:
     parser.add_argument("--review-set", required=True)
     parser.add_argument("--annotations", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--event-absent-as-irrelevant",
+        action="store_true",
+        help="Use relevance 0 when event_present is false and the recorded grade is 2 or 3",
+    )
     args = parser.parse_args()
 
     result = analyze_annotations(
         json.loads(Path(args.review_set).read_text()),
         json.loads(Path(args.annotations).read_text()),
+        event_absent_as_irrelevant=args.event_absent_as_irrelevant,
     )
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
