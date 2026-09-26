@@ -22,6 +22,9 @@ h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.2rem, 5v
 .primary { background: #12664f; border: 1px solid #12664f; border-radius: 5px; color: white; font-weight: 700; padding: 10px 17px; }
 .primary:hover { background: #0d523f; }
 .primary:disabled { cursor: wait; opacity: .65; }
+.dataset-row { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 2px 0; min-height: 32px; }
+.dataset-row .notice { margin: 0; padding: 6px 10px; }
+.dataset-picker { align-items: center; color: #46544e; display: inline-flex; font-size: .9rem; font-weight: 600; gap: 8px; }
 .controls-row { align-items: center; display: flex; flex-wrap: wrap; gap: 14px 25px; margin: 13px 2px 0; }
 .clap-toggle { align-items: center; background: #f1f2ec; border: 1px solid #c9cec6; border-radius: 5px; display: inline-flex; gap: 8px; padding: 7px 10px; }
 .clap-toggle.active { background: #e2f3ec; border-color: #75a896; }
@@ -45,6 +48,8 @@ select { background: #fffefa; border: 1px solid #b7c0b8; border-radius: 4px; pad
 .source-toggle-text.active { background: #e8f3eb; border-color: #6ca486; }
 .source-toggle-audio.active { background: #e7f0f6; border-color: #719ab0; }
 .source-toggle-yamnet.active { background: #f5eedf; border-color: #b69c65; }
+.source-toggle.disabled { opacity: .55; cursor: not-allowed; }
+.source-toggle.disabled input { cursor: not-allowed; }
 .source-toggle input { accent-color: #12664f; }
 .source-toggle span { display: grid; gap: 1px; }
 .source-toggle strong { font-size: .9rem; }

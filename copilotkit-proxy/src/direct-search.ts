@@ -18,6 +18,7 @@ export interface DirectSearchRequest {
   indexes: SearchIndex[];
   k: number;
   rewrite: boolean;
+  dataset_id?: string;
   plan?: SearchPlan;
 }
 
@@ -79,6 +80,10 @@ export function parseSearchRequest(value: unknown): DirectSearchRequest {
   if (source.indexes !== undefined && !Array.isArray(source.indexes)) {
     throw new Error("indexes debe ser una lista.");
   }
+  if (source.dataset_id !== undefined && typeof source.dataset_id !== "string") {
+    throw new Error("dataset_id debe ser una cadena.");
+  }
+  const dataset_id = source.dataset_id ? String(source.dataset_id) : undefined;
   const explicitIndexes = Array.isArray(source.indexes)
     ? source.indexes.filter((index): index is SearchIndex =>
       index === "text" || index === "audio" || index === "yamnet")
@@ -104,7 +109,7 @@ export function parseSearchRequest(value: unknown): DirectSearchRequest {
   if (!Number.isInteger(k) || k < 1 || k > 50) throw new Error("k debe ser un entero entre 1 y 50.");
 
   const plan = parsePlan(source.plan, query, indexes);
-  return { query, indexes, k, rewrite: source.rewrite !== false, plan };
+  return { query, indexes, k, rewrite: source.rewrite !== false, dataset_id, plan };
 }
 
 export function parsePlan(value: unknown, query: string, indexes: SearchIndex[]): SearchPlan | undefined {
@@ -195,15 +200,16 @@ export async function executeSearch(request: DirectSearchRequest, transport: Ser
         : index === "yamnet"
           ? plan.yamnet_query_en
           : undefined;
-      const body = savedTranslation
+      const body: Record<string, unknown> = savedTranslation
         ? { query, query_en: savedTranslation, k: request.k }
         : { query, k: request.k };
+      if (request.dataset_id) body.dataset_id = request.dataset_id;
       const payload = await transport.request("POST", path, body);
       const retrieval = payload as RetrievalResponse;
       const translatedQuery = index === "audio" || index === "yamnet"
         ? retrieval.translated_query
         : undefined;
-      return { index, translatedQuery, bucket: {
+      return { index, translatedQuery, datasetMeta: pickDatasetMeta(payload), bucket: {
         available: true,
         effective_query: query,
         ...(translatedQuery ? { translated_query: translatedQuery } : {}),
@@ -214,6 +220,7 @@ export async function executeSearch(request: DirectSearchRequest, transport: Ser
       return {
         index,
         translatedQuery: undefined,
+        datasetMeta: {} as DatasetMeta,
         bucket: unavailableIndex(query, "Fuente de búsqueda no disponible temporalmente."),
       };
     }
@@ -225,10 +232,31 @@ export async function executeSearch(request: DirectSearchRequest, transport: Ser
     ...(audioTranslation ? { audio_query_en: audioTranslation } : {}),
     ...(yamnetTranslation ? { yamnet_query_en: yamnetTranslation } : {}),
   };
+  // All searched indexes returned from the same dataset; surface once at top level.
+  const representativeMeta = searches.find(({ datasetMeta }) => datasetMeta?.dataset_id)?.datasetMeta;
   return {
     query: request.query,
+    dataset_id: representativeMeta?.dataset_id,
+    dataset_label: representativeMeta?.dataset_label,
+    dataset_release: representativeMeta?.dataset_release,
     plan: resolvedPlan,
     took_ms: Date.now() - start,
     indexes: Object.fromEntries(searches.map(({ index, bucket }) => [index, bucket])),
   };
+}
+
+interface DatasetMeta {
+  dataset_id?: string;
+  dataset_label?: string;
+  dataset_release?: string;
+}
+
+function pickDatasetMeta(payload: unknown): DatasetMeta {
+  if (!payload || typeof payload !== "object") return {};
+  const source = payload as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  if (typeof source.dataset_id === "string") result.dataset_id = source.dataset_id;
+  if (typeof source.dataset_label === "string") result.dataset_label = source.dataset_label;
+  if (typeof source.dataset_release === "string") result.dataset_release = source.dataset_release;
+  return result;
 }

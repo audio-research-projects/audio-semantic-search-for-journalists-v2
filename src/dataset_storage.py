@@ -76,6 +76,46 @@ def resolve_dataset_path(dataset_path: str | None = None) -> str:
     return str(destination)
 
 
+def stage_release(source_uri: str, destination: str | Path) -> str:
+    """Stage a specific GCS release into ``destination`` and return the local path.
+
+    Unlike ``resolve_dataset_path`` this targets an explicit release URI instead
+    of the environment variable, allowing multiple releases to coexist on the same
+    runtime.
+    """
+    destination_path = Path(destination).resolve()
+    if not destination_path.is_relative_to(_EPHEMERAL_ROOT):
+        raise ValueError(
+            f"Dataset staging destination must be under {_EPHEMERAL_ROOT}, got {destination_path}"
+        )
+
+    bucket_name, prefix = _parse_gcs_uri(source_uri)
+    with _STAGING_LOCK:
+        if _is_current_snapshot(destination_path, source_uri):
+            logger.info(
+                "Using cached dataset snapshot from %s at %s", source_uri, destination_path
+            )
+            return str(destination_path)
+
+        staging = destination_path.with_name(
+            f"{destination_path.name}.staging-{uuid.uuid4().hex}"
+        )
+        try:
+            _download_prefix(bucket_name, prefix, staging)
+            if not (staging / _REQUIRED_DATASET_FILE).is_file():
+                raise RuntimeError(
+                    f"Dataset release {source_uri} is missing {_REQUIRED_DATASET_FILE}."
+                )
+            (staging / _SOURCE_MARKER).write_text(f"{source_uri}\n", encoding="utf-8")
+            _replace_snapshot(staging, destination_path)
+        except Exception:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+
+    logger.info("Staged dataset snapshot from %s at %s", source_uri, destination_path)
+    return str(destination_path)
+
+
 def _parse_gcs_uri(source_uri: str) -> tuple[str, str]:
     parsed = urlparse(source_uri)
     prefix = parsed.path.lstrip("/").rstrip("/")

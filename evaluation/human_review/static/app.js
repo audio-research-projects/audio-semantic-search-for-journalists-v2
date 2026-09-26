@@ -8,10 +8,38 @@ const state = {
 const localeKey = "audio-search-locale";
 const translations = {
   es: {
-    title: "Búsqueda semántica sobre audios de archivo periodístico", eyebrow: "Evaluación humana", heading: "Retrieval acústico periodístico", language: "Idioma", reviewer: "Revisor", export: "Exportar JSON", saved: "juicios guardados", questions: "consultas", previous: "Consulta anterior", next: "Consulta siguiente", clapQuery: "Consulta enviada al encoder textual de CLAP", target: "Evento o propiedad buscada", method: "El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar relevancia; no uses la transcripción como sustituto del sonido.", candidate: "Candidato", segment: "Segmento", originalRank: "rank original", source: "Fuente", time: "Tiempo", transcript: "Transcripción auxiliar", relevance: "Relevancia para la consulta", grades: ["Irrelevante", "Tangencial", "Relevante", "Directa"], eventPresent: "¿Está presente el evento?", unknown: "No se puede determinar", yes: "Sí", no: "No", confidence: "Confianza", confidenceValues: ["Muy baja", "Baja", "Media", "Alta", "Muy alta"], notes: "Notas", notesPlaceholder: "Ambigüedades, sonidos concurrentes o motivo de la decisión", save: "Guardar y continuar", savedStatus: "Juicio ya guardado", saving: "Guardando…", saveError: "No se pudo guardar", loadError: "No se pudo cargar la muestra de revisión", transcriptMissing: "Sin transcripción", yamnetOn: "disponible", yamnetOff: "no activo",
+    title: "Búsqueda semántica sobre audios de archivo periodístico", eyebrow: "Evaluación humana", heading: "Retrieval acústico periodístico", language: "Idioma", reviewer: "Revisor", export: "Exportar JSON", saved: "juicios guardados", questions: "consultas", previous: "Consulta anterior", next: "Consulta siguiente", nextPending: "Próxima consulta pendiente", clapQuery: "Consulta enviada al encoder textual de CLAP", target: "Evento o propiedad buscada", method: "El ranking es solo una selección de candidatos. Escuchá el audio antes de asignar relevancia; no uses la transcripción como sustituto del sonido.", candidate: "Candidato", segment: "Segmento", originalRank: "rank original", source: "Fuente", time: "Tiempo", transcript: "Transcripción auxiliar", relevance: "Relevancia para la consulta", grades: ["Irrelevante", "Tangencial", "Relevante", "Directa"], eventPresent: "¿Está presente el evento?", unknown: "No se puede determinar", yes: "Sí", no: "No", confidence: "Confianza", confidenceValues: ["Muy baja", "Baja", "Media", "Alta", "Muy alta"], notes: "Notas", notesPlaceholder: "Ambigüedades, sonidos concurrentes o motivo de la decisión", save: "Guardar y continuar",
+    help: "Ayuda",
+    helpTitle: "Atajos de teclado",
+    helpNote: "En fragmentos nuevos, la relevancia inicia preseleccionada en 2 · Relevante.",
+    shortcuts: [
+      ["Q / W / E / R", "Asignar relevancia 0 – 3"],
+      ["1 – 5", "Asignar confianza"],
+      ["Y / N", "Evento presente: sí / no"],
+      ["S", "Guardar y continuar"],
+      ["Espacio", "Reproducir / pausar el audio"],
+      ["← / →", "Candidato anterior / siguiente"],
+      ["⇥", "Ir a la próxima consulta pendiente"],
+      ["?", "Mostrar u ocultar esta ayuda"],
+    ],
+    savedStatus: "Juicio ya guardado", saving: "Guardando…", saveError: "No se pudo guardar", loadError: "No se pudo cargar la muestra de revisión", transcriptMissing: "Sin transcripción", yamnetOn: "disponible", yamnetOff: "no activo",
   },
   en: {
-    title: "Semantic Search Across Journalistic Audio Archives", eyebrow: "Human review", heading: "Journalistic acoustic retrieval", language: "Language", reviewer: "Reviewer", export: "Export JSON", saved: "saved judgments", questions: "queries", previous: "Previous query", next: "Next query", clapQuery: "Query sent to CLAP's text encoder", target: "Sought event or property", method: "The ranking is only a candidate selection. Listen to the audio before assigning relevance; do not use the transcript as a substitute for sound.", candidate: "Candidate", segment: "Segment", originalRank: "original rank", source: "Source", time: "Time", transcript: "Supporting transcript", relevance: "Relevance to the query", grades: ["Irrelevant", "Tangential", "Relevant", "Direct"], eventPresent: "Is the event present?", unknown: "Cannot determine", yes: "Yes", no: "No", confidence: "Confidence", confidenceValues: ["Very low", "Low", "Medium", "High", "Very high"], notes: "Notes", notesPlaceholder: "Ambiguities, concurrent sounds, or rationale for the decision", save: "Save and continue", savedStatus: "Judgment already saved", saving: "Saving…", saveError: "Could not save", loadError: "Could not load the review sample", transcriptMissing: "No transcript", yamnetOn: "available", yamnetOff: "inactive",
+    title: "Semantic Search Across Journalistic Audio Archives", eyebrow: "Human review", heading: "Journalistic acoustic retrieval", language: "Language", reviewer: "Reviewer", export: "Export JSON", saved: "saved judgments", questions: "queries", previous: "Previous query", next: "Next query", nextPending: "Next pending query", clapQuery: "Query sent to CLAP's text encoder", target: "Sought event or property", method: "The ranking is only a candidate selection. Listen to the audio before assigning relevance; do not use the transcript as a substitute for sound.", candidate: "Candidate", segment: "Segment", originalRank: "original rank", source: "Source", time: "Time", transcript: "Supporting transcript", relevance: "Relevance to the query", grades: ["Irrelevant", "Tangential", "Relevant", "Direct"], eventPresent: "Is the event present?", unknown: "Cannot determine", yes: "Yes", no: "No", confidence: "Confidence", confidenceValues: ["Very low", "Low", "Medium", "High", "Very high"], notes: "Notes", notesPlaceholder: "Ambiguities, concurrent sounds, or rationale for the decision", save: "Save and continue",
+    help: "Help",
+    helpTitle: "Keyboard shortcuts",
+    helpNote: "For new fragments, relevance starts preselected at 2 · Relevant.",
+    shortcuts: [
+      ["Q / W / E / R", "Assign relevance 0 – 3"],
+      ["1 – 5", "Assign confidence"],
+      ["Y / N", "Event present: yes / no"],
+      ["S", "Save and continue"],
+      ["Space", "Play / pause the audio"],
+      ["← / →", "Previous / next candidate"],
+      ["⇥", "Jump to next pending query"],
+      ["?", "Show or hide this help"],
+    ],
+    savedStatus: "Judgment already saved", saving: "Saving…", saveError: "Could not save", loadError: "Could not load the review sample", transcriptMissing: "No transcript", yamnetOn: "available", yamnetOff: "inactive",
   },
 };
 const browserLocale = () => navigator.languages.some((language) => language.toLowerCase().startsWith("en")) ? "en" : "es";
@@ -37,6 +65,19 @@ function renderLanguage() {
   byId("notes").placeholder = t.notesPlaceholder;
   byId("previous-query").title = t.previous;
   byId("next-query").title = t.next;
+  byId("next-pending").title = t.nextPending;
+  byId("help-button").title = t.help;
+  byId("help-title").textContent = t.helpTitle;
+  byId("help-note").textContent = t.helpNote;
+  const list = byId("help-shortcuts");
+  list.replaceChildren();
+  t.shortcuts.forEach(([key, description]) => {
+    const item = document.createElement("li");
+    const kbd = document.createElement("kbd");
+    kbd.textContent = key;
+    item.append(kbd, ` ${description}`);
+    list.appendChild(item);
+  });
 }
 
 function currentCase() {
@@ -63,7 +104,7 @@ function updateProgress() {
 
 function clearForm() {
   document.querySelectorAll('input[name="relevance"]').forEach((input) => {
-    input.checked = false;
+    input.checked = input.value === "2";
   });
   byId("event-present").value = "unknown";
   byId("confidence").value = "3";
@@ -166,6 +207,53 @@ async function saveAnnotation(event) {
   moveCandidate(1);
 }
 
+function firstPendingCandidateIndex(reviewCase, reviewer) {
+  return reviewCase.candidates.findIndex(
+    (candidate) =>
+      !state.annotations.has(
+        annotationKey(reviewer, reviewCase.eval_case_id, candidate.segment.segment_id),
+      ),
+  );
+}
+
+function toggleHelp(show) {
+  byId("help-overlay").hidden = show === undefined ? !byId("help-overlay").hidden : !show;
+}
+
+function jumpToNextPending() {
+  const reviewer = currentReviewer();
+  const total = state.data.cases.length;
+  for (let step = 1; step <= total; step += 1) {
+    const queryIndex = (state.queryIndex + step) % total;
+    const candidateIndex = firstPendingCandidateIndex(state.data.cases[queryIndex], reviewer);
+    if (candidateIndex !== -1) {
+      state.queryIndex = queryIndex;
+      state.candidateIndex = candidateIndex;
+      render();
+      return;
+    }
+  }
+}
+
+function jumpToFirstUnannotated() {
+  const reviewer = currentReviewer();
+  for (let queryIndex = 0; queryIndex < state.data.cases.length; queryIndex += 1) {
+    const reviewCase = state.data.cases[queryIndex];
+    for (let candidateIndex = 0; candidateIndex < reviewCase.candidates.length; candidateIndex += 1) {
+      const key = annotationKey(
+        reviewer,
+        reviewCase.eval_case_id,
+        reviewCase.candidates[candidateIndex].segment.segment_id,
+      );
+      if (!state.annotations.has(key)) {
+        state.queryIndex = queryIndex;
+        state.candidateIndex = candidateIndex;
+        return;
+      }
+    }
+  }
+}
+
 async function initialize() {
   const response = await fetch("/api/review-set");
   if (!response.ok) throw new Error(copy().loadError);
@@ -176,6 +264,7 @@ async function initialize() {
       annotation,
     );
   });
+  jumpToFirstUnannotated();
   byId("question-count").textContent = state.data.sample_composition.questions;
   byId("yamnet-status").textContent = state.data.configuration.yamnet_available
     ? copy().yamnetOn
@@ -186,7 +275,16 @@ async function initialize() {
 byId("annotation-form").addEventListener("submit", saveAnnotation);
 byId("previous-query").addEventListener("click", () => moveQuery(-1));
 byId("next-query").addEventListener("click", () => moveQuery(1));
-byId("reviewer").addEventListener("change", render);
+byId("next-pending").addEventListener("click", jumpToNextPending);
+byId("help-button").addEventListener("click", () => toggleHelp());
+byId("help-close").addEventListener("click", () => toggleHelp(false));
+byId("help-overlay").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) toggleHelp(false);
+});
+byId("reviewer").addEventListener("change", () => {
+  jumpToFirstUnannotated();
+  render();
+});
 byId("language-selector").addEventListener("change", (event) => {
   locale = event.target.value === "en" ? "en" : "es";
   localStorage.setItem(localeKey, locale);
@@ -194,10 +292,35 @@ byId("language-selector").addEventListener("change", (event) => {
   if (state.data) render();
 });
 document.addEventListener("keydown", (event) => {
-  if (["0", "1", "2", "3"].includes(event.key) && document.activeElement.tagName !== "TEXTAREA") {
-    const radio = document.querySelector(`input[name="relevance"][value="${event.key}"]`);
+  if (event.key === "Escape") {
+    toggleHelp(false);
+    return;
+  }
+  const active = document.activeElement;
+  const typing =
+    active.tagName === "TEXTAREA" ||
+    active.tagName === "SELECT" ||
+    (active.tagName === "INPUT" && active.type !== "radio");
+  if (typing) return;
+  const relevanceByKey = { q: "0", w: "1", e: "2", r: "3" };
+  const relevanceValue = relevanceByKey[event.key.toLowerCase()];
+  if (relevanceValue !== undefined) {
+    const radio = document.querySelector(`input[name="relevance"][value="${relevanceValue}"]`);
     if (radio) radio.checked = true;
   }
+  if (["1", "2", "3", "4", "5"].includes(event.key)) {
+    byId("confidence").value = event.key;
+  }
+  if (event.key === "y") byId("event-present").value = "true";
+  if (event.key === "n") byId("event-present").value = "false";
+  if (event.key === "s") byId("annotation-form").requestSubmit();
+  if (event.key === " ") {
+    event.preventDefault();
+    const audio = byId("audio");
+    if (audio.paused) audio.play();
+    else audio.pause();
+  }
+  if (event.key === "?") toggleHelp();
   if (event.key === "ArrowRight") moveCandidate(1);
   if (event.key === "ArrowLeft") moveCandidate(-1);
 });

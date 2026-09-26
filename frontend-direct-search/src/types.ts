@@ -47,8 +47,23 @@ export interface IndexResults {
   error?: string;
 }
 
+export interface DatasetInfo {
+  id: string;
+  label: string;
+  language: string;
+  active_indexes: SearchIndex[];
+  dataset_version?: string;
+}
+
+export interface DatasetsResponse {
+  datasets: DatasetInfo[];
+}
+
 export interface SearchResponse {
   query: string;
+  dataset_id?: string;
+  dataset_label?: string;
+  dataset_release?: string;
   plan: SearchPlan;
   took_ms: number;
   indexes: Partial<Record<SearchIndex, IndexResults>>;
@@ -61,5 +76,6 @@ export interface SearchRequest {
   include_yamnet: boolean;
   k: number;
   rewrite: boolean;
+  dataset_id?: string;
   plan?: SearchPlan;
 }

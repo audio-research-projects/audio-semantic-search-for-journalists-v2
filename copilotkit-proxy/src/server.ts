@@ -221,11 +221,22 @@ app.get("/api/segments/:segmentId", async (request, response) => {
   }
 });
 
-app.get("/api/corpus", async (_request, response) => {
+app.get("/api/datasets", async (_request, response) => {
   const client = requireSearchService(response);
   if (!client) return;
   try {
-    response.json(await client.request("GET", "/corpus"));
+    response.json(await client.request("GET", "/datasets"));
+  } catch (error) {
+    response.status(502).json({ detail: "No fue posible listar los datasets." });
+  }
+});
+
+app.get("/api/corpus", async (request, response) => {
+  const client = requireSearchService(response);
+  if (!client) return;
+  try {
+    const datasetId = typeof request.query.dataset_id === "string" ? request.query.dataset_id : undefined;
+    response.json(await client.request("GET", datasetId ? `/corpus?dataset_id=${encodeURIComponent(datasetId)}` : "/corpus"));
   } catch (error) {
     response.status(502).json({ detail: "No fue posible consultar el corpus." });
   }

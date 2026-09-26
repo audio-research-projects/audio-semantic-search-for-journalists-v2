@@ -23,8 +23,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from src.agent_service.search_engine import AudioSearchEngine
-from src.dataset_storage import resolve_dataset_path
 from src.query_translation import translate_to_english
+from src.search_service.dataset_registry import DatasetRegistry
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
@@ -35,13 +35,17 @@ logger = logging.getLogger(__name__)
 # Loading the encoders costs far more than a request, so it happens at startup
 # rather than on the first query. Readiness stays false until it finishes, which
 # is what lets Cloud Run hold traffic back instead of serving a slow request.
-_engine: AudioSearchEngine | None = None
+_registry: DatasetRegistry | None = None
 _startup_error: str | None = None
 
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Consulta en lenguaje natural")
     k: int = Field(default=5, ge=1, le=50, description="Cantidad de segmentos")
+    dataset_id: str | None = Field(
+        default=None,
+        description="Catálogo de datasets configurado en el servicio. Si se omite usa el default.",
+    )
 
 
 class AudioSearchRequest(SearchRequest):
@@ -60,26 +64,28 @@ class SearchResponse(BaseModel):
 
     results: list[dict]
     translated_query: str | None = None
+    dataset_id: str | None = None
+    dataset_label: str | None = None
+    dataset_release: str | None = None
 
 
-def _warm_up() -> AudioSearchEngine:
-    """Load the dataset, indices and default text encoder.
+def _warm_up() -> DatasetRegistry:
+    """Load the dataset catalog and the default dataset plus its text encoder.
 
     CLAP remains lazy because acoustic search is opt-in. Its first requested
     search may therefore take longer while the checkpoint is loaded.
     """
-    engine = AudioSearchEngine(resolve_dataset_path())
+    registry = DatasetRegistry()
     # Text search is the default path, so readiness waits for that encoder only.
-    engine.text_model.generate_embedding("warm up")
-    logger.info("Search service warm: %d segments indexed", engine.total_segments)
-    return engine
+    registry.get_engine(registry.default_dataset_id()).text_model.generate_embedding("warm up")
+    return registry
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    global _engine, _startup_error
+    global _registry, _startup_error
     try:
-        _engine = _warm_up()
+        _registry = _warm_up()
     except Exception as error:  # noqa: BLE001 - surfaced through /readyz
         # Swallowed so the container still binds a port and can report why it is
         # unhealthy; crashing would only produce an opaque restart loop.
@@ -96,13 +102,28 @@ app = FastAPI(
 )
 
 
-def _require_engine() -> AudioSearchEngine:
-    if _engine is None:
+def _require_engine(dataset_id: str | None = None) -> AudioSearchEngine:
+    if _registry is None:
         raise HTTPException(
             status_code=503,
             detail=f"Search engine unavailable: {_startup_error or 'still warming up'}",
         )
-    return _engine
+    try:
+        return _registry.get_engine(dataset_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+def _dataset_meta(engine: AudioSearchEngine, dataset_id: str | None) -> dict[str, str | None]:
+    if _registry is None:
+        return {"dataset_id": dataset_id, "dataset_label": None, "dataset_release": None}
+    resolved_id = dataset_id or _registry.default_dataset_id()
+    entry = _registry.catalog_entry(resolved_id) or {}
+    return {
+        "dataset_id": resolved_id,
+        "dataset_label": entry.get("label"),
+        "dataset_release": entry.get("release_uri"),
+    }
 
 
 @app.get("/health")
@@ -114,16 +135,26 @@ async def health() -> dict[str, str]:
 @app.get("/readyz")
 async def readyz() -> dict:
     """Readiness: true once the dataset, indices and default text encoder are loaded."""
-    if _engine is None:
+    if _registry is None:
         raise HTTPException(status_code=503, detail=_startup_error or "warming up")
-    return {"status": "ready", "total_segments": _engine.total_segments}
+    engine = _require_engine()
+    return {"status": "ready", "total_segments": engine.total_segments}
+
+
+@app.get("/datasets")
+async def datasets() -> dict:
+    """List datasets available to the direct-search UI."""
+    if _registry is None:
+        raise HTTPException(status_code=503, detail=_startup_error or "warming up")
+    return {"datasets": _registry.list_datasets()}
 
 
 @app.get("/corpus")
-async def corpus() -> dict:
+async def corpus(dataset_id: str | None = None) -> dict:
     """Metadata needed by the direct-search UI; no corpus text is exposed here."""
-    engine = _require_engine()
+    engine = _require_engine(dataset_id)
     return {
+        "dataset_id": dataset_id or _registry.default_dataset_id() if _registry else None,
         "total_segments": engine.total_segments,
         "files": [],
         "active_indexes": engine.active_indexes,
@@ -134,7 +165,11 @@ async def corpus() -> dict:
 @app.post("/search/semantic", response_model=SearchResponse)
 async def search_semantic(request: SearchRequest) -> SearchResponse:
     """Text search over the transcriptions."""
-    return SearchResponse(results=_require_engine().search_semantic(request.query, k=request.k))
+    engine = _require_engine(request.dataset_id)
+    return SearchResponse(
+        results=engine.search_semantic(request.query, k=request.k),
+        **_dataset_meta(engine, request.dataset_id),
+    )
 
 
 @app.post("/search/audio", response_model=SearchResponse)
@@ -145,14 +180,16 @@ async def search_audio(request: AudioSearchRequest) -> SearchResponse:
     is English-language. ``query_en`` is accepted only to replay a previously
     returned search plan without translating it again.
     """
+    engine = _require_engine(request.dataset_id)
     translated_query = request.query_en or translate_to_english(request.query)
     return SearchResponse(
-        results=_require_engine().search_audio_by_text(
+        results=engine.search_audio_by_text(
             translated_query,
             k=request.k,
             source_language="en",
         ),
         translated_query=translated_query,
+        **_dataset_meta(engine, request.dataset_id),
     )
 
 
@@ -163,32 +200,32 @@ async def search_yamnet(request: AudioSearchRequest) -> SearchResponse:
     This is label/classifier search rather than vector similarity. The service
     still translates fresh queries so Spanish terms can match AudioSet labels.
     """
+    engine = _require_engine(request.dataset_id)
     translated_query = request.query_en or translate_to_english(request.query)
     return SearchResponse(
-        results=_require_engine().search_audio_by_classes(
-            translated_query, k=request.k, source_language="en"
-        ),
+        results=engine.search_audio_by_classes(translated_query, k=request.k, source_language="en"),
         translated_query=translated_query,
+        **_dataset_meta(engine, request.dataset_id),
     )
 
 
 @app.get("/segments/{segment_id}")
-async def get_segment(segment_id: int) -> dict:
+async def get_segment(segment_id: int, dataset_id: str | None = None) -> dict:
     """Full metadata for one segment."""
-    segment = _require_engine().get_segment_info(segment_id)
+    segment = _require_engine(dataset_id).get_segment_info(segment_id)
     if segment is None:
         raise HTTPException(status_code=404, detail=f"Segmento {segment_id} no encontrado.")
     return {"segment": segment}
 
 
 @app.get("/segments/{segment_id}/audio-classes")
-async def get_audio_classes(segment_id: int) -> dict:
+async def get_audio_classes(segment_id: int, dataset_id: str | None = None) -> dict:
     """YAMNet AudioSet labels stored for one segment.
 
     An empty list means the dataset was ingested without YAMNet enabled, which
     the caller reports differently from a missing segment.
     """
-    classes = _require_engine().get_audio_classes(segment_id)
+    classes = _require_engine(dataset_id).get_audio_classes(segment_id)
     if classes is None:
         raise HTTPException(status_code=404, detail=f"Segmento {segment_id} no encontrado.")
     return {"classes": classes}

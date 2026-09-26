@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Búsqueda semántica sobre audios de archivo periodístico</title>
-    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/styles.css?v=3" />
   </head>
   <body>
     <header class="topbar">
@@ -16,6 +16,7 @@
         <label><span id="reviewer-label">Revisor</span> <input id="reviewer" value="anonymous" /></label>
         <label class="language-selector"><span id="language-label">Idioma</span><select id="language-selector"><option value="es">Español</option><option value="en">English</option></select></label>
         <a class="button secondary" href="/api/export" id="export-link">Exportar JSON</a>
+        <button id="help-button" class="icon-button" type="button" title="Ayuda">?</button>
       </div>
     </header>
 
@@ -33,6 +34,7 @@
             <button id="previous-query" class="icon-button" title="Consulta anterior">←</button>
             <span id="query-position"></span>
             <button id="next-query" class="icon-button" title="Consulta siguiente">→</button>
+            <button id="next-pending" class="icon-button" title="Próxima consulta pendiente">⇥</button>
           </div>
           <p id="category" class="pill"></p>
           <h2 id="question">Cargando…</h2>
@@ -107,6 +109,14 @@
         </article>
       </section>
     </main>
-    <script type="module" src="/assets/app.js"></script>
+    <div id="help-overlay" hidden>
+      <div class="help-panel" role="dialog" aria-modal="true">
+        <button id="help-close" class="icon-button" type="button">×</button>
+        <h2 id="help-title">Atajos de teclado</h2>
+        <ul id="help-shortcuts"></ul>
+        <p id="help-note" class="method-note"></p>
+      </div>
+    </div>
+    <script type="module" src="/assets/app.js?v=5"></script>
   </body>
 </html>

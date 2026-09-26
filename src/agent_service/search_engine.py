@@ -44,26 +44,37 @@ def _configured_min_segment_duration() -> float:
 class AudioSearchEngine:
     """Motor de búsqueda semántica sobre el corpus de audio indexado."""
 
-    def __init__(self, dataset_path: str):
+    def __init__(
+        self,
+        dataset_path: str,
+        text_model: TextEmbeddingModel | None = None,
+        clap_model: CLAPEmbedding | None = None,
+        clips_gcs_uri: str | None = None,
+    ):
         """
         Carga dataset, embeddings e índices FAISS.
 
         Args:
             dataset_path: Path to the processed dataset directory
+            text_model: Optional shared text embedding model to avoid loading it twice
+            clap_model: Optional shared CLAP model to avoid loading it twice
+            clips_gcs_uri: Optional GCS prefix for playback clips of this dataset
         """
         self.dataset_path = Path(dataset_path)
         self._df: pd.DataFrame | None = None
         self._text_index: faiss.IndexFlatIP | None = None
         self._audio_index: faiss.IndexFlatIP | None = None
-        self._text_model: TextEmbeddingModel | None = None
-        self._clap_model: CLAPEmbedding | None = None
+        self._text_model: TextEmbeddingModel | None = text_model
+        self._clap_model: CLAPEmbedding | None = clap_model
         self._active_embeddings: set[str] | None = None
         self._active_classifiers: set[str] | None = None
         self._dataset_version: str | None = None
         self._segment_positions: dict[int, int] = {}
         self._yamnet_inverted_index: dict[str, list[dict[str, object]]] = {}
         self._min_segment_duration_seconds = _configured_min_segment_duration()
-        self._clip_store = SegmentClipStore(dataset_path=self.dataset_path)
+        self._clip_store = SegmentClipStore(
+            dataset_path=self.dataset_path, clips_gcs_uri=clips_gcs_uri
+        )
 
         self._load_dataset()
         self._load_indices()

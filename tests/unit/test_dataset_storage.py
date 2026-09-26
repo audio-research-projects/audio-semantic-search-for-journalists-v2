@@ -19,12 +19,13 @@ class _FakeBlob:
 
 
 class _FakeStorageClient:
-    def __init__(self, blobs: list[_FakeBlob]):
+    def __init__(self, blobs: list[_FakeBlob], expected_prefix: str = "releases/v1/"):
         self._blobs = blobs
+        self._expected_prefix = expected_prefix
 
     def list_blobs(self, bucket_name: str, prefix: str):
         assert bucket_name == "your-test-bucket"
-        assert prefix == "releases/v1/"
+        assert prefix == self._expected_prefix
         return self._blobs
 
 
@@ -84,3 +85,26 @@ def test_resolve_dataset_path_keeps_local_development_path(monkeypatch):
     monkeypatch.setenv("DATASET_PATH", "./dataset")
 
     assert dataset_storage.resolve_dataset_path() == "dataset"
+
+
+def test_stage_release_downloads_explicit_release_uri(monkeypatch):
+    target = Path("/tmp") / f"audio-search-staging-{uuid.uuid4().hex}"
+    blobs = [
+        _FakeBlob("releases/v2/final/complete_dataset.pkl", b"dataset"),
+        _FakeBlob("releases/v2/indices/text_index.faiss", b"index"),
+    ]
+    monkeypatch.setattr(dataset_storage.storage, "Client", lambda: _FakeStorageClient(blobs, expected_prefix="releases/v2/"))
+
+    try:
+        resolved = Path(dataset_storage.stage_release("gs://your-test-bucket/releases/v2", target))
+
+        assert resolved == target.resolve()
+        assert (target / "final/complete_dataset.pkl").read_bytes() == b"dataset"
+        assert (target / "indices/text_index.faiss").read_bytes() == b"index"
+    finally:
+        shutil.rmtree(target, ignore_errors=True)
+
+
+def test_stage_release_rejects_non_ephemeral_destination():
+    with pytest.raises(ValueError, match="must be under"):
+        dataset_storage.stage_release("gs://your-test-bucket/releases/v2", "/some/path")

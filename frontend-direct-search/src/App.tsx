@@ -1,7 +1,7 @@
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { search } from "./api";
+import { fetchDatasets, search } from "./api";
 import { detectLocale, persistLocale, ui, type Locale, type UiCopy } from "./i18n";
-import type { IndexResults, SearchIndex, SearchPlan, SearchResponse, SearchResult } from "./types";
+import type { DatasetInfo, IndexResults, SearchIndex, SearchPlan, SearchResponse, SearchResult } from "./types";
 
 const indexLabels = (copy: UiCopy): Record<SearchIndex, string> => ({
   text: copy.indexText,
@@ -73,13 +73,55 @@ export default function App() {
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [queue, setQueue] = useState<string[] | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const [datasets, setDatasets] = useState<DatasetInfo[] | null>(null);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [datasetLoading, setDatasetLoading] = useState(true);
+  const [datasetError, setDatasetError] = useState<string | null>(null);
 
   useEffect(() => {
     persistLocale(locale);
     document.title = copy.pageTitle;
   }, [copy.pageTitle, locale]);
 
+  useEffect(() => {
+    const abortController = new AbortController();
+    void (async () => {
+      try {
+        const result = await fetchDatasets(abortController.signal);
+        setDatasets(result.datasets);
+        const fromUrl = initialUrl.get("dataset");
+        const initialDataset = result.datasets.find(dataset => dataset.id === fromUrl) ?? result.datasets[0];
+        setSelectedDatasetId(initialDataset?.id ?? null);
+      } catch (reason) {
+        if ((reason as Error).name !== "AbortError") setDatasetError(copy.datasetError);
+      } finally {
+        setDatasetLoading(false);
+      }
+    })();
+    return () => abortController.abort();
+  }, [copy.datasetError]);
+
   const changeLocale = (value: Locale) => setLocale(value);
+
+  const selectedDataset = useMemo(
+    () => datasets?.find(dataset => dataset.id === selectedDatasetId),
+    [datasets, selectedDatasetId],
+  );
+  const datasetActiveIndexes = useMemo(
+    () => new Set<SearchIndex>(selectedDataset?.active_indexes ?? []),
+    [selectedDataset],
+  );
+
+  useEffect(() => {
+    if (!selectedDataset) return;
+    setIncludeText(current => (selectedDataset.active_indexes.includes("text") ? current : false));
+    setIncludeClap(current => (selectedDataset.active_indexes.includes("audio") ? current : false));
+    setIncludeYamnet(current => (selectedDataset.active_indexes.includes("yamnet") ? current : false));
+    setResponse(null);
+    setDraftPlan(null);
+    setEditingPlan(false);
+    setQueue(null);
+  }, [selectedDataset]);
 
   const selectedIndexes = useMemo<SearchIndex[]>(
     () => [
@@ -102,14 +144,19 @@ export default function App() {
     if (!includeText) url.searchParams.set("text", "0"); else url.searchParams.delete("text");
     if (includeClap) url.searchParams.set("clap", "1"); else url.searchParams.delete("clap");
     if (includeYamnet) url.searchParams.set("yamnet", "1"); else url.searchParams.delete("yamnet");
+    if (selectedDatasetId) url.searchParams.set("dataset", selectedDatasetId); else url.searchParams.delete("dataset");
     url.searchParams.set("k", String(k));
     window.history.replaceState(null, "", url);
-  }, [query, includeText, includeClap, includeYamnet, k]);
+  }, [query, includeText, includeClap, includeYamnet, k, selectedDatasetId]);
 
   const performSearch = useCallback(async (plan?: SearchPlan) => {
     const cleanedQuery = query.trim();
     if (!cleanedQuery) {
       setError(copy.searchError);
+      return;
+    }
+    if (selectedIndexes.length === 0) {
+      setError(copy.minimumIndexError);
       return;
     }
     controller.current?.abort();
@@ -119,7 +166,7 @@ export default function App() {
     setError(null);
     setQueue(null);
     try {
-      const result = await search({ query: cleanedQuery, include_text: includeText, include_clap: includeClap, include_yamnet: includeYamnet, k, rewrite, plan }, nextController.signal);
+      const result = await search({ query: cleanedQuery, include_text: includeText, include_clap: includeClap, include_yamnet: includeYamnet, k, rewrite, dataset_id: selectedDatasetId ?? undefined, plan }, nextController.signal);
       setResponse(result);
       setDraftPlan(result.plan);
       setEditingPlan(false);
@@ -128,10 +175,12 @@ export default function App() {
     } finally {
       if (controller.current === nextController) setLoading(false);
     }
-  }, [copy.searchError, includeText, includeClap, includeYamnet, k, query, rewrite]);
+  }, [copy.searchError, includeText, includeClap, includeYamnet, k, query, rewrite, selectedDatasetId]);
 
   const onSubmit = (event: FormEvent) => { event.preventDefault(); void performSearch(); };
   const changeSourceInclusion = (source: "text" | "clap" | "yamnet", enabled: boolean) => {
+    const index: SearchIndex = source === "text" ? "text" : source === "clap" ? "audio" : "yamnet";
+    if (!datasetActiveIndexes.has(index)) return;
     if (!enabled && selectedIndexes.length === 1) {
       setError(copy.minimumIndexError);
       return;
@@ -230,19 +279,31 @@ export default function App() {
           <div className="search-line">
             <label className="sr-only" htmlFor="query">{copy.query}</label>
             <input id="query" value={query} onChange={event => setQuery(event.target.value)} placeholder={copy.queryPlaceholder} autoFocus />
-            <button className="primary" type="submit" disabled={loading}>{loading ? copy.searching : copy.searchButton}</button>
+            <button className="primary" type="submit" disabled={loading || datasetLoading || !selectedDataset}>{loading ? copy.searching : copy.searchButton}</button>
+          </div>
+          <div className="dataset-row">
+            {datasetLoading && <p className="notice">{copy.datasetLoading}</p>}
+            {!datasetLoading && datasetError && <p className="notice error" role="alert">{datasetError}</p>}
+            {!datasetLoading && !datasetError && selectedDataset && (
+              <label className="dataset-picker">
+                {copy.dataset}
+                <select value={selectedDatasetId ?? ""} onChange={event => setSelectedDatasetId(event.target.value)} aria-label={copy.dataset}>
+                  {(datasets ?? []).map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.label}</option>)}
+                </select>
+              </label>
+            )}
           </div>
           <div className="controls-row">
-            <label className={`source-toggle source-toggle-text ${includeText ? "active" : ""}`}>
-              <input type="checkbox" checked={includeText} onChange={event => changeSourceInclusion("text", event.target.checked)} />
+            <label className={`source-toggle source-toggle-text ${includeText ? "active" : ""}${!datasetActiveIndexes.has("text") ? " disabled" : ""}`}>
+              <input type="checkbox" checked={includeText} disabled={!datasetActiveIndexes.has("text")} onChange={event => changeSourceInclusion("text", event.target.checked)} />
               <span><strong>{copy.includeText}</strong><small>{copy.includeTextHelp}</small></span>
             </label>
-            <label className={`source-toggle source-toggle-audio ${includeClap ? "active" : ""}`}>
-              <input type="checkbox" checked={includeClap} onChange={event => changeSourceInclusion("clap", event.target.checked)} />
+            <label className={`source-toggle source-toggle-audio ${includeClap ? "active" : ""}${!datasetActiveIndexes.has("audio") ? " disabled" : ""}`}>
+              <input type="checkbox" checked={includeClap} disabled={!datasetActiveIndexes.has("audio")} onChange={event => changeSourceInclusion("clap", event.target.checked)} />
               <span><strong>{copy.includeClap}</strong><small>{copy.includeClapHelp}</small></span>
             </label>
-            <label className={`source-toggle source-toggle-yamnet ${includeYamnet ? "active" : ""}`}>
-              <input type="checkbox" checked={includeYamnet} onChange={event => changeSourceInclusion("yamnet", event.target.checked)} />
+            <label className={`source-toggle source-toggle-yamnet ${includeYamnet ? "active" : ""}${!datasetActiveIndexes.has("yamnet") ? " disabled" : ""}`}>
+              <input type="checkbox" checked={includeYamnet} disabled={!datasetActiveIndexes.has("yamnet")} onChange={event => changeSourceInclusion("yamnet", event.target.checked)} />
               <span><strong>{copy.includeYamnet}</strong><small>{copy.includeYamnetHelp}</small></span>
             </label>
             <label className="toggle"><input type="checkbox" checked={rewrite} onChange={event => setRewrite(event.target.checked)} /> {copy.rewrite}</label>
@@ -259,7 +320,7 @@ export default function App() {
 
       {response && <>
         <div className="result-toolbar">
-          <p><strong>{allResults.length}</strong> {allResults.length === 1 ? copy.result : copy.resultsPlural} · {response.took_ms} ms</p>
+          <p><strong>{allResults.length}</strong> {allResults.length === 1 ? copy.result : copy.resultsPlural} · {response.took_ms} ms{response.dataset_label ? ` · ${response.dataset_label}` : ""}</p>
           {allResults.length > 1 && <button className="quiet" onClick={startContinuous}>{queue ? copy.playing : copy.playAll}</button>}
         </div>
         <Filters copy={copy} fileFilter={fileFilter} setFileFilter={setFileFilter} fromTime={fromTime} setFromTime={setFromTime} toTime={toTime} setToTime={setToTime} />

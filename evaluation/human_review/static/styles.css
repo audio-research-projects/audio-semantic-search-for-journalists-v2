@@ -87,6 +87,40 @@ select, textarea { width: 100%; margin-top: .4rem; padding: .7rem; border: 1px s
 .button.primary { color: white; background: var(--accent); }
 .button.secondary { color: var(--green); background: white; }
 
+#help-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(24 32 29 / 45%);
+}
+#help-overlay[hidden] { display: none; }
+.help-panel {
+  position: relative;
+  width: min(26rem, 100%);
+  padding: 2rem;
+  border: 1px solid var(--line);
+  border-radius: .8rem;
+  background: var(--paper);
+  box-shadow: 0 14px 40px rgb(30 38 34 / 20%);
+}
+#help-close { position: absolute; top: 1rem; right: 1rem; }
+#help-shortcuts { margin: 0; padding: 0; list-style: none; display: grid; gap: .5rem; }
+#help-shortcuts li { display: flex; align-items: center; gap: .75rem; }
+#help-shortcuts kbd {
+  min-width: 3rem;
+  padding: .25rem .5rem;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: .35rem;
+  background: white;
+  text-align: center;
+  font-family: inherit;
+  font-weight: 800;
+}
+.topbar .icon-button { color: white; border-color: rgb(255 255 255 / 50%); }
+
 @media (max-width: 850px) {
   .topbar, .header-actions { align-items: stretch; flex-direction: column; }
   .workspace { grid-template-columns: 1fr; }
